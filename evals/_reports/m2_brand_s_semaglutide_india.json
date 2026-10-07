@@ -1,0 +1,33 @@
+{
+  "checks": [
+    {
+      "name": "hcp_mode_used",
+      "pass": true,
+      "detail": "mode=hcp_level"
+    },
+    {
+      "name": "every_target_list_row_has_reason",
+      "pass": true,
+      "detail": "2000 entries, 0 missing a reason"
+    },
+    {
+      "name": "tiers_not_collapsed_to_one",
+      "pass": true,
+      "detail": "tiers present: ['t1_grow', 't3_develop', 't4_nurture']"
+    },
+    {
+      "name": "segment_only_mode_flags_segments",
+      "pass": true,
+      "detail": "60 segment-only segments"
+    }
+  ],
+  "rubric": [],
+  "overall": {
+    "pass": true,
+    "mean_rubric_score": null,
+    "min_rubric_score": null
+  },
+  "hcp_count": 2000,
+  "segment_count": 3,
+  "target_list_count": 2000
+}

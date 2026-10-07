@@ -1,0 +1,127 @@
+# US market pack — v0.1
+# Values marked PLACEHOLDER are starting priors for development only.
+
+market: us
+currency: USD
+default_maturity_stage: 3          # coordinated
+fiscal_year_start_month: 1
+
+channels:
+  - id: rep_visit
+    name: Field rep (in-person)
+    unit: call
+    unit_cost: null
+    stage_fit: {unaware: 0.4, aware: 0.7, considering: 1.0, trialist: 1.0, adopter: 0.6, advocate: 0.5}
+    curve_prior: {lambda: 0.5, alpha: 1.5, gamma: 3, beta: null}
+    requires_consent: false
+  - id: rep_remote
+    name: Remote rep detail
+    unit: call
+    unit_cost: null
+    stage_fit: {unaware: 0.3, aware: 0.7, considering: 0.8, trialist: 0.7, adopter: 0.5, advocate: 0.3}
+    curve_prior: {lambda: 0.4, alpha: 1.3, gamma: 3, beta: null}
+    requires_consent: false
+  - id: email
+    name: Email (rep-triggered and brand)
+    unit: send
+    unit_cost: null
+    stage_fit: {unaware: 0.5, aware: 0.7, considering: 0.6, trialist: 0.5, adopter: 0.5, advocate: 0.2}
+    curve_prior: {lambda: 0.3, alpha: 1.1, gamma: 8, beta: null}
+    requires_consent: true
+    consent_field: email
+  - id: npp
+    name: Non-personal promotion on HCP portals (e.g. Medscape, Doximity)
+    unit: impression_1000
+    unit_cost: null
+    stage_fit: {unaware: 1.0, aware: 0.8, considering: 0.5, trialist: 0.3, adopter: 0.2, advocate: 0.1}
+    curve_prior: {lambda: 0.3, alpha: 1.0, gamma: 40, beta: null}
+    requires_consent: false
+  - id: ehr_poc
+    name: EHR point-of-care messaging
+    unit: message
+    unit_cost: null
+    stage_fit: {unaware: 0.5, aware: 0.6, considering: 0.8, trialist: 0.9, adopter: 0.6, advocate: 0.2}
+    curve_prior: {lambda: 0.3, alpha: 1.2, gamma: 10, beta: null}
+    requires_consent: false
+  - id: programmatic_hcp
+    name: Programmatic HCP media (NPI-targeted)
+    unit: impression_1000
+    unit_cost: null
+    stage_fit: {unaware: 1.0, aware: 0.6, considering: 0.4, trialist: 0.2, adopter: 0.2, advocate: 0.1}
+    curve_prior: {lambda: 0.3, alpha: 1.0, gamma: 60, beta: null}
+    requires_consent: false
+  - id: speaker_program
+    name: Speaker programmes / peer-to-peer
+    unit: event
+    unit_cost: null
+    stage_fit: {unaware: 0.3, aware: 0.7, considering: 1.0, trialist: 0.8, adopter: 0.6, advocate: 1.0}
+    curve_prior: {lambda: 0.7, alpha: 1.5, gamma: 1, beta: null}
+    requires_consent: false
+  - id: msl
+    name: MSL scientific exchange (non-promotional)
+    unit: interaction
+    unit_cost: null
+    stage_fit: {unaware: 0.2, aware: 0.5, considering: 0.8, trialist: 0.6, adopter: 0.4, advocate: 0.7}
+    curve_prior: {lambda: 0.6, alpha: 1.3, gamma: 1, beta: null}
+    requires_consent: false
+    notes: "Medical, not promotional — outcome attribution reported separately"
+  - id: dtc
+    name: Direct-to-consumer (TV, digital, social)
+    unit: grp_or_impression_1000
+    unit_cost: null
+    stage_fit: {unaware: 0.6, aware: 0.5, considering: 0.4, trialist: 0.3, adopter: 0.2, advocate: 0.0}
+    curve_prior: {lambda: 0.7, alpha: 1.2, gamma: 100, beta: null}
+    requires_consent: false
+  - id: hub_copay
+    name: Hub services and copay programmes
+    unit: enrolled_patient_month
+    unit_cost: null
+    stage_fit: {unaware: 0.0, aware: 0.1, considering: 0.5, trialist: 1.0, adopter: 1.0, advocate: 0.4}
+    curve_prior: {lambda: 0.8, alpha: 1.2, gamma: 500, beta: null}
+    requires_consent: true
+    consent_field: patient_programme
+
+fit_weights: {affinity: 0.35, access: 0.25, stage_fit: 0.25, content_fit: 0.15}
+access_weights: {open: 1.0, restricted: 0.5, no_see: 0.1, unknown: 0.6}
+frequency_caps: {rep_visit: 3, rep_remote: 2, email: 4, ehr_poc: 8}
+suppress_after: 3
+
+data_sources:
+  - {id: rx_hcp, name: "HCP-level Rx (e.g. IQVIA Xponent, Symphony)", origin: external, grain: npi x week, licensed: true}
+  - {id: claims, name: "Claims (e.g. Komodo, IQVIA, Symphony)", origin: external, grain: patient/npi, licensed: true}
+  - {id: npi, name: "NPPES NPI registry", origin: external, grain: hcp}
+  - {id: open_payments, name: "CMS Open Payments", origin: external, grain: hcp x payment}
+  - {id: crm, name: "CRM (Veeva, Salesforce)", origin: internal, grain: hcp x call x date}
+  - {id: engagement, name: "Email / NPP / EHR / programmatic logs", origin: internal, grain: hcp x event}
+  - {id: own_sales, name: "Sales, 867/852 data, payer contracts", origin: internal, grain: account x month}
+  - {id: spend, name: "Spend by channel", origin: internal, grain: channel x month}
+
+compliance_rules:
+  # Legal review required before production use.
+  - {id: US-FB-01, rule: "Promotional content must present fair balance of benefit and risk (FDA/OPDP)", applies_to: [all], severity: block}
+  - {id: US-LABEL-01, rule: "On-label promotion only; off-label only via medical/MSL on unsolicited request", applies_to: [all], severity: block}
+  - {id: US-PHRMA-01, rule: "PhRMA Code: no entertainment/recreation; modest meals only in educational context", applies_to: [rep_visit, speaker_program], severity: block}
+  - {id: US-SUN-01, rule: "Sunshine Act: transfers of value to HCPs reportable to CMS Open Payments", applies_to: [speaker_program, rep_visit], severity: warn}
+  - {id: US-SPAM-01, rule: "CAN-SPAM: opt-out and sender identification in commercial email", applies_to: [email], severity: block}
+  - {id: US-HIPAA-01, rule: "HIPAA: patient PHI only with authorisation; de-identified data for analytics", applies_to: [hub_copay, dtc], severity: block}
+  - {id: US-MSL-01, rule: "MSL activity is non-promotional; do not include in promotional NBA sequences", applies_to: [msl], severity: block}
+
+signals: [email_open, email_click, portal_view, ehr_message_view, detail_requested, sample_requested,
+          speaker_attended, content_viewed, first_rx, repeat_rx, patient_enrolled, pa_approved]
+
+engagement_depth: {delivered: 0.1, opened: 0.3, clicked: 0.6, attended: 0.6, requested_followup: 1.0}
+
+priors:
+  rung_transition_monthly: {unaware: 0.25, aware: 0.15, considering: 0.10, trialist: 0.20, adopter: 0.05}   # PLACEHOLDER
+  persistence_6m_default: null
+  benchmark_confidence: 0.4
+
+tiers:
+  t1_grow: {potential_pctl_min: 70, rungs: [aware, considering, trialist]}
+  t2_defend: {potential_pctl_min: 70, rungs: [adopter, advocate]}
+  t3_develop: {potential_pctl_min: 30, potential_pctl_max: 70, reachability_min: 0.5}
+  t4_nurture: {}
+
+kpis:
+  leading: [reach, frequency, engagement_index, rung_movement]
+  lagging: [nrx, trx, nbrx, market_share, persistence_6m, revenue, roi]

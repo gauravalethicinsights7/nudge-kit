@@ -1,0 +1,55 @@
+# Production stack for the Oracle Cloud Always Free VM (Ampere A1, arm64).
+#
+# The API is NOT published to the host — nothing listens on a public port.
+# cloudflared dials out to Cloudflare and reaches the API over the internal
+# compose network, so the VM needs no inbound firewall rule and no TLS
+# certificate of its own.
+#
+#   docker compose -f deploy/docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nudge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-nudge}
+    volumes:
+      - nudge_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nudge} -d ${POSTGRES_DB:-nudge}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nudge}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nudge}
+    volumes:
+      - nudge_uploads:/app/var/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/system/status || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in deploy/.env}
+    depends_on:
+      - api
+
+volumes:
+  nudge_pgdata:
+  nudge_uploads:

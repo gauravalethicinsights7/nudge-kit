@@ -1,0 +1,63 @@
+[project]
+name = "nudge-omnichannel"
+version = "0.1.0"
+description = "NUDGE Omnichannel — pharma brand-planning decision engine"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3.6",
+    "pyyaml>=6.0",
+    "anthropic>=0.39",
+    "python-dotenv>=1.0",
+    "httpx>=0.27",
+    "trafilatura>=1.12",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "python-docx>=1.1",
+    # CLAUDE.md names pymc-marketing specifically, but both 1.0.0 and 1.2.0
+    # crash at import time in this environment: pymc_marketing.mmm.components
+    # .adstock.AdstockTransformation's @validate_call decorator is incompatible
+    # with pydantic 2.13.5, which this whole project depends on for its core
+    # typing (confirmed by testing both versions directly). Building the
+    # Bayesian adstock+Hill fitting on plain pymc instead — the library
+    # pymc-marketing itself wraps — since only its now-broken high-level
+    # transformer/MMM classes are actually unusable, not the underlying engine.
+    "pymc>=6.0",
+    "cvxpy>=1.9.3",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "pyjwt>=2.9",
+    "bcrypt>=4.2",
+    "email-validator>=2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires a live Postgres+pgvector (docker-compose)",
+    "live: hits the real Anthropic API (requires ANTHROPIC_API_KEY) and/or SERPER_API_KEY",
+    "slow: runs real PyMC MCMC sampling (seconds to minutes, no external services)",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["schemas", "packs", "store", "llm", "evals", "ingest", "models", "tools", "agents", "exporters", "api"]

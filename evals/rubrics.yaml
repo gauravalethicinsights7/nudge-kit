@@ -1,0 +1,27 @@
+# LLM-judge rubrics. Score 1–5 each; judge must cite the output text it relied on.
+# Use a different model tier from the generator. Pass bar: mean >= 4.0 and no criterion < 3.
+
+m1_research:
+  - {id: coverage, desc: "Answers every question-bank block; gaps listed explicitly"}
+  - {id: accuracy, desc: "Numbers match cited sources; fixture known_facts found"}
+  - {id: source_quality, desc: "Prefers primary/peer-reviewed/regulator sources; dates present"}
+  - {id: gap_honesty, desc: "No invented numbers; unknowns flagged not filled"}
+
+m3_personas:
+  - {id: actionability, desc: "Each persona implies a different message emphasis or channel mix"}
+  - {id: grounding, desc: "Drivers and barriers cite evidence or are marked assumption"}
+  - {id: realism, desc: "Plausible for the market's HCPs (e.g. India tier 2/3 realities)"}
+  - {id: distinctness, desc: "No two personas collapse into one"}
+
+m4_competitive:
+  - {id: accuracy, desc: "Claims quoted verbatim with source and date"}
+  - {id: completeness, desc: "Competitor set covers leaders and recent entrants"}
+  - {id: whitespace_value, desc: "Whitespace is important to target personas and defensible"}
+
+m5_brand_plan:          # align with NUDGE Decision-stage rubric
+  - {id: coherence, desc: "Situation -> key issues -> imperatives -> objectives form one logic chain"}
+  - {id: traceability, desc: "Every imperative and pillar traces to quantified issues and evidence"}
+  - {id: specificity, desc: "Named segments, numbers, dates — no generic 'increase awareness'"}
+  - {id: realism, desc: "Targets and forecast plausible vs benchmarks and budget"}
+  - {id: actionability, desc: "A brand manager could brief agencies and field from it tomorrow"}
+  - {id: compliance, desc: "No claims or tactics that breach the active pack's rules"}

@@ -1,0 +1,25 @@
+{
+  "checks": [
+    {
+      "name": "fixture_exists",
+      "pass": true,
+      "detail": "/Users/apple/Desktop/nudge-kit/fixtures/brand_s_semaglutide_india.yaml"
+    },
+    {
+      "name": "fixture_has_brand",
+      "pass": true,
+      "detail": "top-level 'brand' key present"
+    },
+    {
+      "name": "pack_loads_for_fixture_market",
+      "pass": true,
+      "detail": "load_pack('india') validated"
+    }
+  ],
+  "rubric": [],
+  "overall": {
+    "pass": true,
+    "mean_rubric_score": null,
+    "min_rubric_score": null
+  }
+}

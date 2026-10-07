@@ -1,0 +1,141 @@
+# India market pack — v0.1
+# Values marked PLACEHOLDER are starting priors for development only.
+# Calibrate with client history / licensed benchmarks before any client output.
+
+market: india
+currency: INR
+default_maturity_stage: 2          # channel-centric
+fiscal_year_start_month: 4
+
+channels:
+  - id: rep_visit
+    name: Field rep visit (detailing)
+    unit: call
+    unit_cost: null                 # TODO: loaded cost per call from client (salary + T&A / calls)
+    capacity_rule: reps * working_days * calls_per_day
+    capacity_defaults: {working_days_per_month: 22, calls_per_day: 10}   # PLACEHOLDER
+    stage_fit: {unaware: 0.5, aware: 0.8, considering: 1.0, trialist: 1.0, adopter: 0.7, advocate: 0.5}
+    curve_prior: {lambda: 0.5, alpha: 1.5, gamma: 4, beta: null}         # PLACEHOLDER
+    requires_consent: false
+  - id: whatsapp
+    name: WhatsApp (opt-in, rep-initiated or brand)
+    unit: message
+    unit_cost: null
+    stage_fit: {unaware: 0.3, aware: 0.7, considering: 0.7, trialist: 0.8, adopter: 0.8, advocate: 0.4}
+    curve_prior: {lambda: 0.3, alpha: 1.2, gamma: 6, beta: null}
+    requires_consent: true
+    consent_field: whatsapp
+  - id: email
+    name: Email
+    unit: send
+    unit_cost: null
+    stage_fit: {unaware: 0.5, aware: 0.6, considering: 0.5, trialist: 0.4, adopter: 0.4, advocate: 0.2}
+    curve_prior: {lambda: 0.3, alpha: 1.1, gamma: 8, beta: null}
+    requires_consent: true
+    consent_field: email
+  - id: webinar_cme
+    name: Webinar / CME
+    unit: attendance
+    unit_cost: null
+    stage_fit: {unaware: 0.4, aware: 0.8, considering: 0.9, trialist: 0.6, adopter: 0.5, advocate: 0.7}
+    curve_prior: {lambda: 0.6, alpha: 1.3, gamma: 2, beta: null}
+    requires_consent: false
+  - id: e_detailing
+    name: Remote / e-detailing
+    unit: session
+    unit_cost: null
+    stage_fit: {unaware: 0.3, aware: 0.7, considering: 0.8, trialist: 0.7, adopter: 0.5, advocate: 0.3}
+    curve_prior: {lambda: 0.4, alpha: 1.3, gamma: 3, beta: null}
+    requires_consent: false
+  - id: kol_peer
+    name: KOL / peer-to-peer meeting
+    unit: event
+    unit_cost: null
+    stage_fit: {unaware: 0.3, aware: 0.7, considering: 1.0, trialist: 0.8, adopter: 0.6, advocate: 1.0}
+    curve_prior: {lambda: 0.7, alpha: 1.5, gamma: 1, beta: null}
+    requires_consent: false
+  - id: hcp_media
+    name: HCP digital media (medical portals, programmatic HCP)
+    unit: impression_1000
+    unit_cost: null
+    stage_fit: {unaware: 1.0, aware: 0.7, considering: 0.4, trialist: 0.2, adopter: 0.2, advocate: 0.1}
+    curve_prior: {lambda: 0.3, alpha: 1.0, gamma: 50, beta: null}
+    requires_consent: false
+  - id: congress
+    name: Congress / society meeting presence
+    unit: event
+    unit_cost: null
+    stage_fit: {unaware: 0.8, aware: 0.8, considering: 0.6, trialist: 0.3, adopter: 0.4, advocate: 0.6}
+    curve_prior: {lambda: 0.6, alpha: 1.2, gamma: 1, beta: null}
+    requires_consent: false
+  - id: patient_support
+    name: Patient support programme (nurse educators, reminders, helpline)
+    unit: enrolled_patient_month
+    unit_cost: null
+    stage_fit: {unaware: 0.0, aware: 0.1, considering: 0.4, trialist: 1.0, adopter: 1.0, advocate: 0.5}
+    curve_prior: {lambda: 0.8, alpha: 1.2, gamma: 500, beta: null}
+    requires_consent: true
+    consent_field: patient_programme
+  - id: chemist_trade
+    name: Chemist / stockist programmes
+    unit: outlet_month
+    unit_cost: null
+    stage_fit: {unaware: 0.1, aware: 0.2, considering: 0.3, trialist: 0.6, adopter: 0.6, advocate: 0.1}
+    curve_prior: {lambda: 0.5, alpha: 1.1, gamma: 200, beta: null}
+    requires_consent: false
+
+fit_weights: {affinity: 0.35, access: 0.2, stage_fit: 0.3, content_fit: 0.15}   # PLACEHOLDER
+access_weights: {open: 1.0, restricted: 0.6, no_see: 0.2, unknown: 0.7}           # PLACEHOLDER
+frequency_caps: {rep_visit: 4, whatsapp: 6, email: 4, webinar_cme: 2, e_detailing: 2}  # per HCP per month, PLACEHOLDER
+suppress_after: 3                  # unanswered touches per channel
+
+potential_proxies:                 # used when HCP-level Rx is absent (origin=estimated)
+  specialty_weight: {endocrinologist: 1.0, diabetologist: 1.0, consulting_physician: 0.7, cardiologist: 0.5, gp: 0.3}
+  setting_weight: {hospital: 1.0, clinic: 0.8, both: 1.0}
+  city_tier_weight: {metro: 1.0, tier1: 0.8, tier2: 0.6, tier3: 0.4}
+  signals: [patient_volume_estimate, chemist_offtake_catchment, rep_class]
+
+data_sources:
+  - {id: sales_audit, name: "Secondary sales audit (e.g. AWACS Pharmatrac, IQVIA)", origin: external, grain: brand x region x month, licensed: true}
+  - {id: rx_audit, name: "Prescription audit", origin: external, grain: brand x specialty x period, licensed: true}
+  - {id: hcp_registry, name: "Medical council registers / HCP database vendor", origin: external, grain: hcp}
+  - {id: crm, name: "CRM / SFA (Veeva, Salesforce, local)", origin: internal, grain: hcp x call x date}
+  - {id: engagement, name: "Email / WhatsApp / webinar / portal logs", origin: internal, grain: hcp x event}
+  - {id: own_sales, name: "Primary/secondary sales, stockist data", origin: internal, grain: territory x month}
+  - {id: spend, name: "Spend by channel, field force size", origin: internal, grain: channel x month}
+
+compliance_rules:
+  # Source: UCPMP 2024 (Department of Pharmaceuticals); summary per Trilegal. Legal review required before production use.
+  - {id: IN-GIFT-01, rule: "No gifts, pecuniary advantage or benefit in kind to HCPs or family members", applies_to: [all], severity: block}
+  - {id: IN-REMIND-01, rule: "Brand reminders / educational items max INR 1,000 per item, professional use only", applies_to: [rep_visit], severity: block}
+  - {id: IN-SAMPLE-01, rule: "Samples max 12 packs per drug per HCP per year; each ≤ smallest commercial pack; aggregate value ≤ 2% of domestic sales", applies_to: [rep_visit], severity: block}
+  - {id: IN-CME-01, rule: "CME/CPD: travel and hospitality only for speakers; no events in foreign locations; disclose funding and speaker selection", applies_to: [webinar_cme, kol_peer, congress], severity: block}
+  - {id: IN-CLAIM-01, rule: "Claims must be balanced, up to date, verifiable and substantiated; comparisons factual", applies_to: [all], severity: block}
+  - {id: IN-DTC-01, rule: "No promotion of prescription (Schedule H/H1) brands to patients/public; disease awareness must not be surrogate promotion", applies_to: [patient_support, hcp_media], severity: block}
+  - {id: IN-PRIV-01, rule: "DPDP Act 2023: explicit consent for personal data processing (WhatsApp, email, patient programmes)", applies_to: [whatsapp, email, patient_support], severity: block}
+
+signals:                            # observable events for journey exit/escalation
+  [email_open, email_click, whatsapp_read, whatsapp_reply, webinar_registered, webinar_attended,
+   detail_requested, sample_requested, content_viewed, first_rx, repeat_rx, patient_enrolled]
+
+engagement_depth: {delivered: 0.1, opened: 0.3, clicked: 0.6, attended: 0.6, requested_followup: 1.0}
+
+priors:
+  rung_transition_monthly:          # PLACEHOLDER: P(move up one rung in a month | targeted)
+    unaware: 0.25
+    aware: 0.15
+    considering: 0.10
+    trialist: 0.20
+    adopter: 0.05
+  persistence_6m_default: null      # TODO: therapy-specific
+  benchmark_confidence: 0.3
+
+tiers:
+  t1_grow: {potential_pctl_min: 70, rungs: [aware, considering, trialist]}
+  t2_defend: {potential_pctl_min: 70, rungs: [adopter, advocate]}
+  t3_develop: {potential_pctl_min: 30, potential_pctl_max: 70, reachability_min: 0.5}
+  t4_nurture: {}
+
+kpis:
+  leading: [reach, frequency, engagement_index, rung_movement]
+  lagging: [nrx, trx, market_share, persistence_6m, revenue, roi]

@@ -1,0 +1,45 @@
+# Fixed question bank, per specs/m1-research.md — every brand gets the same
+# depth. Block names match the spec table; questions expand each block's
+# terse summary into concrete, independently-answerable questions.
+
+disease_patient_flow:
+  - "What is the prevalence of the disease/condition this brand treats?"
+  - "What percentage of prevalent patients are diagnosed?"
+  - "What percentage of diagnosed patients are treated?"
+  - "What percentage of treated patients are controlled/at goal?"
+  - "What is the biggest leak in the patient funnel, and why does it happen?"
+
+treatment_paradigm:
+  - "What is this drug class/brand's position in current treatment guidelines?"
+  - "At what line of therapy is this class/brand typically used?"
+  - "What triggers a prescriber to switch a patient to or away from this class?"
+  - "What unmet needs remain in this treatment paradigm?"
+
+market_access:
+  - "What is the market size in value for this category?"
+  - "What is the market size in volume for this category?"
+  - "What is the market growth rate?"
+  - "What are the typical price bands for branded vs. generic/biosimilar options?"
+  - "What is the reimbursement or out-of-pocket situation for patients?"
+  - "What is the generics/biosimilars penetration and trend?"
+
+prescriber_universe:
+  - "Which specialties treat this condition?"
+  - "Approximately how many prescribers are there per relevant specialty?"
+  - "How concentrated is prescribing (what share of volume comes from the top 20% of prescribers)?"
+  - "In what settings (hospital, clinic, both) does prescribing happen?"
+
+channel_landscape:
+  - "What channels do HCPs in this specialty use or prefer for professional information?"
+  - "What is typical rep access like for this specialty/market?"
+  - "What digital platforms (portals, apps, EHR messaging) are in use by these HCPs?"
+
+competitive_set:
+  - "Which brands and companies compete in this category?"
+  - "What is the share trend among competitors?"
+  - "What recent launches have occurred in this category?"
+  - "What recent price moves have competitors made?"
+
+regulatory_compliance:
+  - "What promotion code constraints are relevant to this brand in this market?"
+  - "Have there been recent regulatory enforcement actions or warnings in this category?"

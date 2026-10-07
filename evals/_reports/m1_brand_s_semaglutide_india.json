@@ -1,0 +1,10 @@
+{
+  "checks": [],
+  "rubric": [],
+  "overall": {
+    "pass": false,
+    "mean_rubric_score": null,
+    "min_rubric_score": null
+  },
+  "skipped_reason": "requires both ANTHROPIC_API_KEY and BRAVE_API_KEY"
+}

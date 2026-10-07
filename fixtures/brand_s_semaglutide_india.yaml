@@ -1,0 +1,67 @@
+# Worked example fixture — illustrative brand, real market facts (as of Sep 2026).
+# "Brand S" is fictional. Segment sizes, shares and budgets are illustrative.
+
+brand:
+  name: Brand S
+  molecule: semaglutide
+  indication: type 2 diabetes (weight management as adjacent)
+  market: india
+  lifecycle_stage: launch
+  company: "Mid-size Indian pharma (fictional)"
+  price_band: branded_generic
+
+user_inputs:
+  plan_horizon_months: 12
+  revenue_ambition: null          # set per test
+  budget_envelope: null
+  net_price_per_month: null
+  target_share_default: 0.05
+
+known_facts:                      # M1 must find evidence matching each
+  - id: kf1
+    fact: "About 101 million people in India have diabetes and 136 million prediabetes (ICMR-INDIAB, 2023)"
+    source: https://www.thelancet.com/pdfs/journals/landia/PIIS2213-8587(23)00119-5.pdf
+  - id: kf2
+    fact: "India GLP-1 segment ~INR 1,446 crore in 12 months to Feb 2026; tirzepatide (Mounjaro) >60% share"
+    source: https://theindianpractitioner.com/semaglutide-patent-expiry-triggers-generic-rush-in-india/
+  - id: kf3
+    fact: "40+ companies launched generic semaglutide; generics ~33% share by Mar 2026; Mounjaro share fell 71% -> 64%"
+    source: https://www.emarketer.com/content/generic-semaglutide-climbs-33-share-india-eroding-branded-players-pricing-power
+  - id: kf4
+    fact: "Novo Nordisk cut Wegovy/Ozempic prices in India by up to 37% and later up to 40% (Apr 2026)"
+    source: https://www.emarketer.com/content/generic-semaglutide-climbs-33-share-india-eroding-branded-players-pricing-power
+  - id: kf5
+    fact: "Regulatory scrutiny of surrogate promotion disguised as awareness campaigns"
+    source: https://theindianpractitioner.com/semaglutide-patent-expiry-triggers-generic-rush-in-india/
+
+expected_key_issue: "With 40+ near-identical molecules, price alone will not win; trust in quality, titration support and patient persistence decide share"
+
+expected_segments:
+  - {name: "Metro endocrinologists & diabetologists", rung_brand: aware, tier_hint: t2_defend_category}
+  - {name: "Consulting physicians, metro + tier 1", rung_brand: considering, tier_hint: t1_grow}
+  - {name: "Tier 2/3 physicians & diabetologists", rung_brand: aware, tier_hint: t1_or_t3}
+  - {name: "GPs", rung_brand: unaware, tier_hint: t4_nurture}
+
+expected_personas:
+  - {name: "Evidence purist", top_driver: evidence_strength, barrier: "generic quality doubt"}
+  - {name: "Pragmatic prescriber", top_driver: cost, barrier: "patient affordability"}
+  - {name: "Cautious adopter", top_driver: tolerability, barrier: "GI side effects and titration"}
+  - {name: "Busy volume doctor", top_driver: convenience, barrier: "consult time"}
+
+expected_whitespace_driver: support_services   # "affordable GLP-1 therapy patients stay on"
+
+expected_imperatives:
+  - "Win first GLP-1 starts among T1 consulting physicians"
+  - "Neutralise quality doubt among endocrinologists"
+  - "Own 6-month persistence through patient support"
+
+illustrative_channel_split:        # sanity reference for M6, not a target
+  rep_visit: 0.45
+  kol_peer_plus_webinar_cme: 0.20
+  whatsapp_plus_e_detailing: 0.10
+  patient_support: 0.20
+  measurement_tests: 0.05
+
+synthetic_data:
+  hcp_sample: fixtures/hcp_sample_india.csv   # to be generated in session M2: 2,000 rows
+  columns: [crm_id, specialty, setting, state, city, city_tier, territory_id, rep_class, access, consent_email, consent_whatsapp, patient_volume_estimate]

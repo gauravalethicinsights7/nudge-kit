@@ -1,0 +1,306 @@
+# evals/gold/m7_redteam.yaml
+# Guardrail red-team suite for M7 (specs/m7-orchestration.md Done-when:
+# "Guardrail red-team suite ... ≥ 30 cases -> 0 violations exported").
+# Each case is one candidate (hcp consent, channel, content flags, touch
+# counts) fed straight into models.guardrails.check_action_guardrails
+# (tests/test_models_guardrails_redteam.py). expect_blocked=true cases must
+# never survive into an export; expect_blocked=false cases must always
+# survive with zero reasons. Pack facts used below (india):
+#   frequency_caps: {rep_visit: 4, whatsapp: 6, email: 4, webinar_cme: 2, e_detailing: 2}
+#   suppress_after: 3
+#   consent required: whatsapp (consent.whatsapp), email (consent.email),
+#     patient_support (declares consent_field patient_programme, which the
+#     fixed Consent schema doesn't have -> always fails closed, see
+#     models/guardrails.py::_has_consent's comment)
+cases:
+  - id: r01
+    description: clean rep_visit, no consent required
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r02
+    description: clean whatsapp with consent
+    channel: whatsapp
+    consent: {whatsapp: true}
+    content: {mlr_status: approved}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r03
+    description: clean email with consent
+    channel: email
+    consent: {email: true}
+    content: {mlr_status: approved}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r04
+    description: whatsapp without consent
+    channel: whatsapp
+    consent: {}
+    content: {mlr_status: approved}
+    expect_blocked: true
+    expect_reasons: [no_consent]
+
+  - id: r05
+    description: email without consent
+    channel: email
+    consent: {}
+    content: {mlr_status: approved}
+    expect_blocked: true
+    expect_reasons: [no_consent]
+
+  - id: r06
+    description: mlr_status=none on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: none}
+    expect_blocked: true
+    expect_reasons: [mlr_not_approved]
+
+  - id: r07
+    description: mlr_status=submitted on email with consent
+    channel: email
+    consent: {email: true}
+    content: {mlr_status: submitted}
+    expect_blocked: true
+    expect_reasons: [mlr_not_approved]
+
+  - id: r08
+    description: mlr_status=rejected on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: rejected}
+    expect_blocked: true
+    expect_reasons: [mlr_not_approved]
+
+  - id: r09
+    description: off-label content on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved, on_label: false}
+    expect_blocked: true
+    expect_reasons: [off_label]
+
+  - id: r10
+    description: unapproved comparative claim on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved, is_comparative: true, comparative_approved: false}
+    expect_blocked: true
+    expect_reasons: [unapproved_comparative_claim]
+
+  - id: r11
+    description: approved comparative claim on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved, is_comparative: true, comparative_approved: true}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r12
+    description: patient-directed content on patient_support (also fails closed on consent)
+    channel: patient_support
+    consent: {email: true, whatsapp: true, sms: true}
+    content: {mlr_status: approved, patient_directed: true}
+    expect_blocked: true
+    expect_reasons: [no_consent, patient_directed_rx_promotion]
+
+  - id: r13
+    description: patient-directed content on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved, patient_directed: true}
+    expect_blocked: true
+    expect_reasons: [patient_directed_rx_promotion]
+
+  - id: r14
+    description: exceeds pack compliance limit (UCPMP-style) on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved, exceeds_pack_limit: true}
+    expect_blocked: true
+    expect_reasons: [exceeds_pack_compliance_limit]
+
+  - id: r15
+    description: frequency cap exactly reached on whatsapp
+    channel: whatsapp
+    consent: {whatsapp: true}
+    content: {mlr_status: approved}
+    recent_touch_count: 6
+    expect_blocked: true
+    expect_reasons: [frequency_cap_exceeded]
+
+  - id: r16
+    description: one below frequency cap on whatsapp
+    channel: whatsapp
+    consent: {whatsapp: true}
+    content: {mlr_status: approved}
+    recent_touch_count: 5
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r17
+    description: suppressed after N unanswered touches on email
+    channel: email
+    consent: {email: true}
+    content: {mlr_status: approved}
+    unanswered_touch_count: 3
+    expect_blocked: true
+    expect_reasons: [suppressed_channel]
+
+  - id: r18
+    description: one below suppress_after on email
+    channel: email
+    consent: {email: true}
+    content: {mlr_status: approved}
+    unanswered_touch_count: 2
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r19
+    description: combo - no consent and off-label on email
+    channel: email
+    consent: {}
+    content: {mlr_status: approved, on_label: false}
+    expect_blocked: true
+    expect_reasons: [no_consent, off_label]
+
+  - id: r20
+    description: combo - mlr not approved and patient-directed on patient_support
+    channel: patient_support
+    consent: {}
+    content: {mlr_status: submitted, patient_directed: true}
+    expect_blocked: true
+    expect_reasons: [no_consent, mlr_not_approved, patient_directed_rx_promotion]
+
+  - id: r21
+    description: combo - exceeds pack limit and frequency cap exceeded on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved, exceeds_pack_limit: true}
+    recent_touch_count: 4
+    expect_blocked: true
+    expect_reasons: [exceeds_pack_compliance_limit, frequency_cap_exceeded]
+
+  - id: r22
+    description: clean e_detailing, no consent required
+    channel: e_detailing
+    consent: {}
+    content: {mlr_status: approved}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r23
+    description: clean kol_peer, no consent required, no frequency cap defined
+    channel: kol_peer
+    consent: {}
+    content: {mlr_status: approved}
+    recent_touch_count: 999
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r24
+    description: clean webinar_cme
+    channel: webinar_cme
+    consent: {}
+    content: {mlr_status: approved}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r25
+    description: clean congress, no frequency cap defined
+    channel: congress
+    consent: {}
+    content: {mlr_status: approved}
+    recent_touch_count: 100
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r26
+    description: clean hcp_media
+    channel: hcp_media
+    consent: {}
+    content: {mlr_status: approved}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r27
+    description: clean chemist_trade
+    channel: chemist_trade
+    consent: {}
+    content: {mlr_status: approved}
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r28
+    description: mlr rejected on whatsapp with consent
+    channel: whatsapp
+    consent: {whatsapp: true}
+    content: {mlr_status: rejected}
+    expect_blocked: true
+    expect_reasons: [mlr_not_approved]
+
+  - id: r29
+    description: off-label AND unapproved comparative claim on rep_visit
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved, on_label: false, is_comparative: true, comparative_approved: false}
+    expect_blocked: true
+    expect_reasons: [off_label, unapproved_comparative_claim]
+
+  - id: r30
+    description: comparative approved but off-label on email with consent
+    channel: email
+    consent: {email: true}
+    content: {mlr_status: approved, on_label: false, is_comparative: true, comparative_approved: true}
+    expect_blocked: true
+    expect_reasons: [off_label]
+
+  - id: r31
+    description: patient_support always fails closed on consent even with everything else clean
+    channel: patient_support
+    consent: {email: true, whatsapp: true, sms: true}
+    content: {mlr_status: approved}
+    expect_blocked: true
+    expect_reasons: [no_consent]
+
+  - id: r32
+    description: webinar_cme frequency cap exactly reached
+    channel: webinar_cme
+    consent: {}
+    content: {mlr_status: approved}
+    recent_touch_count: 2
+    expect_blocked: true
+    expect_reasons: [frequency_cap_exceeded]
+
+  - id: r33
+    description: e_detailing frequency cap one below limit
+    channel: e_detailing
+    consent: {}
+    content: {mlr_status: approved}
+    recent_touch_count: 1
+    expect_blocked: false
+    expect_reasons: []
+
+  - id: r34
+    description: rep_visit frequency cap exactly reached
+    channel: rep_visit
+    consent: {}
+    content: {mlr_status: approved}
+    recent_touch_count: 4
+    expect_blocked: true
+    expect_reasons: [frequency_cap_exceeded]
+
+  - id: r35
+    description: everything wrong at once on whatsapp
+    channel: whatsapp
+    consent: {}
+    content: {mlr_status: none, on_label: false, is_comparative: true, comparative_approved: false, patient_directed: true, exceeds_pack_limit: true}
+    recent_touch_count: 10
+    unanswered_touch_count: 10
+    expect_blocked: true
+    expect_reasons: [mlr_not_approved, off_label, unapproved_comparative_claim, patient_directed_rx_promotion, exceeds_pack_compliance_limit, no_consent, frequency_cap_exceeded, suppressed_channel]

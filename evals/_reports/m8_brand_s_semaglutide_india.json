@@ -1,0 +1,42 @@
+{
+  "checks": [
+    {
+      "name": "outcome_for_every_hcp_with_channels_offered",
+      "pass": true,
+      "detail": "2000 outcomes for 2000 HCPs"
+    },
+    {
+      "name": "every_engagement_index_in_bounds",
+      "pass": true,
+      "detail": "range [0.0, 55.0]"
+    },
+    {
+      "name": "scorecard_exports_to_csv_and_markdown",
+      "pass": true,
+      "detail": "4 KPI rows exported both ways"
+    },
+    {
+      "name": "lift_test_recovers_its_planted_effect",
+      "pass": true,
+      "detail": "planted=4.0, effect=3.87, ci=[3.49, 4.24]"
+    },
+    {
+      "name": "prior_update_is_idempotent_and_versioned",
+      "pass": true,
+      "detail": "before=0.150, after=0.845, version=2"
+    },
+    {
+      "name": "assumption_review_produced",
+      "pass": true,
+      "detail": "1 assumption checks"
+    }
+  ],
+  "rubric": [],
+  "overall": {
+    "pass": true,
+    "mean_rubric_score": null,
+    "min_rubric_score": null
+  },
+  "hcp_count": 2000,
+  "outcome_count": 2000
+}

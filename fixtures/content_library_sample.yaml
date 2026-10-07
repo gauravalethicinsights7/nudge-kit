@@ -1,0 +1,87 @@
+# Synthetic content module library for the Brand S fixture — illustrative
+# only, not real MLR-approved content. No real content library exists
+# anywhere in this build (see the approved M7 plan's gap #1); this covers
+# most of the india pack's channels, deliberately leaving one (chemist_trade)
+# with no approved content and one (patient_support) blocked by a structural
+# guardrail flag, so the M7 agent's ContentBrief mechanism has something real
+# to produce end to end.
+modules:
+  - name: "Titration support detail aid"
+    channel_refs: [rep_visit]
+    driver: evidence_strength
+    claim: "Structured titration protocol backed by trial data."
+    format: detail_aid
+    mlr_status: approved
+
+  - name: "Cost comparison leave-behind"
+    channel_refs: [rep_visit]
+    driver: cost
+    claim: "Total cost of therapy vs. leading branded competitor."
+    format: leave_behind
+    mlr_status: approved
+    is_comparative: true
+    comparative_approved: true
+
+  - name: "Patient support WhatsApp reminder series"
+    channel_refs: [whatsapp]
+    driver: support_services
+    claim: "Automated dosing reminders and adherence check-ins."
+    format: whatsapp_message
+    mlr_status: approved
+
+  - name: "Convenience-focused email series"
+    channel_refs: [email]
+    driver: convenience
+    claim: "Once-weekly dosing fits a busy patient's routine."
+    format: email
+    mlr_status: approved
+
+  - name: "CME invitation - guideline update"
+    channel_refs: [webinar_cme]
+    driver: guideline
+    claim: "Updated society guideline positioning for GLP-1 therapy."
+    format: cme_invite
+    mlr_status: approved
+
+  - name: "CME invitation - draft (not yet MLR approved)"
+    channel_refs: [webinar_cme]
+    driver: guideline
+    claim: "Draft guideline update deck, pending MLR review."
+    format: cme_invite
+    mlr_status: submitted
+
+  - name: "Efficacy e-detail module"
+    channel_refs: [e_detailing]
+    driver: efficacy
+    claim: "A1C reduction data from the pivotal trial."
+    format: e_detail
+    mlr_status: approved
+
+  - name: "KOL peer-to-peer video"
+    channel_refs: [kol_peer]
+    driver: peer_use
+    claim: "Peer KOL discusses real-world titration experience."
+    format: video
+    mlr_status: approved
+
+  - name: "HCP media banner - affordability"
+    channel_refs: [hcp_media]
+    driver: cost
+    claim: "Patient assistance programme availability."
+    format: banner
+    mlr_status: approved
+
+  - name: "Congress poster - evidence summary"
+    channel_refs: [congress]
+    driver: evidence_strength
+    claim: "Pooled trial evidence summary poster."
+    format: poster
+    mlr_status: approved
+
+  - name: "Patient support brochure (patient-directed - needs legal review)"
+    channel_refs: [patient_support]
+    driver: support_services
+    claim: "Patient-facing persistence support brochure."
+    format: brochure
+    mlr_status: approved
+    patient_directed: true

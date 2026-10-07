@@ -1,0 +1,48 @@
+{
+  "checks": [
+    {
+      "name": "every_channel_allocated_per_segment",
+      "pass": true,
+      "detail": "30 allocations across 3 segments x 10 channels"
+    },
+    {
+      "name": "no_segment_exceeds_its_prorated_budget",
+      "pass": true,
+      "detail": "all within budget"
+    },
+    {
+      "name": "no_channel_exceeds_capacity",
+      "pass": true,
+      "detail": "all within capacity"
+    },
+    {
+      "name": "no_channel_exceeds_frequency_cap",
+      "pass": true,
+      "detail": "all within frequency caps"
+    },
+    {
+      "name": "all_curves_labelled_prior_low_confidence",
+      "pass": true,
+      "detail": "fixture has no channel history CSV, so every curve stays source=prior and unit_cost stays a flagged low-confidence placeholder, per spec"
+    },
+    {
+      "name": "every_channel_fit_score_in_bounds",
+      "pass": true,
+      "detail": "30 ChannelFit rows"
+    },
+    {
+      "name": "marginal_roi_roughly_equalized_across_interior_channels",
+      "pass": true,
+      "detail": "only 0 interior allocation(s) \u2014 nothing to compare"
+    }
+  ],
+  "rubric": [],
+  "overall": {
+    "pass": true,
+    "mean_rubric_score": null,
+    "min_rubric_score": null
+  },
+  "channel_count": 10,
+  "segment_count": 3,
+  "budget_envelope": 500000.0
+}

@@ -1,0 +1,9 @@
+# fixtures/sales_sample.csv
+# Small synthetic sample for ingest/sales_csv.py's loader test — illustrative
+# only, not real Rx/sales data (no real feed exists anywhere in this build;
+# see the approved M8 plan's gap #2).
+hcp_id,period,nrx,trx
+63213b75-049d-4233-a85a-5f38d282821c,2026-01,2,8
+74774843-faf0-4aae-aace-ffb127b8ddca,2026-01,1,4
+86414e09-3292-45ec-8636-d0ca42d7a388,2026-01,0,2
+63213b75-049d-4233-a85a-5f38d282821c,2026-02,3,10

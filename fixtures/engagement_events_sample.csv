@@ -1,0 +1,13 @@
+# fixtures/engagement_events_sample.csv
+# Small synthetic sample for ingest/engagement_events_csv.py's loader test —
+# illustrative only, not real engagement data (no real engagement-event
+# history exists anywhere in this build; see the approved M8 plan's gap #1).
+hcp_id,channel,depth,occurred_at,period
+63213b75-049d-4233-a85a-5f38d282821c,rep_visit,attended,2026-01-05,2026-01
+63213b75-049d-4233-a85a-5f38d282821c,whatsapp,opened,2026-01-08,2026-01
+63213b75-049d-4233-a85a-5f38d282821c,whatsapp,clicked,2026-01-15,2026-01
+74774843-faf0-4aae-aace-ffb127b8ddca,email,delivered,2026-01-03,2026-01
+74774843-faf0-4aae-aace-ffb127b8ddca,email,opened,2026-01-10,2026-01
+74774843-faf0-4aae-aace-ffb127b8ddca,rep_visit,attended,2026-01-20,2026-01
+86414e09-3292-45ec-8636-d0ca42d7a388,e_detailing,requested_followup,2026-01-12,2026-01
+86414e09-3292-45ec-8636-d0ca42d7a388,webinar_cme,attended,2026-01-22,2026-01
