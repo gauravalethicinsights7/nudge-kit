@@ -54,19 +54,26 @@ VM's default closed firewall is correct and should stay that way.
 
 ---
 
-## 2. Create the Cloudflare Tunnel
+## 2. The Cloudflare Tunnel
 
-Cloudflare dashboard → **Zero Trust → Networks → Tunnels → Create a tunnel**:
+**No domain (default).** Nothing to set up in the dashboard — compose runs a
+free quick tunnel automatically. After Step 4 read the assigned URL with:
 
-1. Type **Cloudflared**, name it `nudge-api`.
-2. On the install screen, copy the long token out of the shown command — that is
-   `CLOUDFLARE_TUNNEL_TOKEN`. Ignore the install instructions themselves; compose
-   runs the connector for you.
-3. **Public Hostname** tab → Add a public hostname:
-   - Subdomain `api`, Domain `yourdomain.com`
-   - Service: **HTTP**, URL `api:8000`
-     (`api` is the compose service name — the connector resolves it on the
-     internal network, which is why nothing is published to the host.)
+```bash
+bash deploy/tunnel-url.sh      # -> https://<random>.trycloudflare.com
+```
+
+That hostname changes every time the `cloudflared` container restarts. When it
+does, rebuild the frontend with the new value (Step 5) — the API's CORS config
+is keyed to your *Pages* URL, which is stable, so only the frontend needs it.
+
+**With a domain** (upgrade later, removes the churn): Cloudflare dashboard →
+**Zero Trust → Networks → Tunnels → Create a tunnel**, type **Cloudflared**,
+name it `nudge-api`. Copy the token from the install screen into `deploy/.env`
+as `CLOUDFLARED_CMD=tunnel --no-autoupdate run --token <token>`, then under
+**Public Hostname** add subdomain `api`, your domain, service **HTTP**, URL
+`api:8000` (`api` is the compose service name, resolved on the internal
+network — which is why nothing is published to the host).
 
 ---
 
@@ -110,7 +117,8 @@ Check it:
 
 ```bash
 sudo docker compose -f deploy/docker-compose.prod.yml logs -f api
-curl https://api.yourdomain.com/system/status
+bash deploy/tunnel-url.sh                      # your public API URL
+curl "$(bash deploy/tunnel-url.sh)/system/status"
 ```
 
 ---
@@ -164,19 +172,23 @@ Frontend: push to the connected branch, or re-run `npm run deploy`.
 
 ---
 
-## No domain?
+## When the tunnel URL changes
 
-A named tunnel needs a Cloudflare zone. Without one, swap the `cloudflared`
-command in `deploy/docker-compose.prod.yml` for a quick tunnel:
+On a quick tunnel, restarting `cloudflared` (or rebooting the VM) assigns a new
+hostname. To recover:
 
-```yaml
-command: tunnel --no-autoupdate --url http://api:8000
+```bash
+# on the VM
+bash deploy/tunnel-url.sh
+
+# on your laptop
+cd frontend
+VITE_API_BASE_URL=<new-url> npm run deploy
 ```
 
-It prints a free `https://<random>.trycloudflare.com` URL in its logs. That URL
-**changes on every restart**, so you must rebuild the frontend with the new
-`VITE_API_BASE_URL` and update `CORS_ORIGINS` each time. Fine for a one-off
-demo, not for anything standing. A domain on Cloudflare (~$10/yr) removes this.
+`CORS_ORIGINS` does not need touching — it lists the frontend's Pages origin,
+which never changes. A domain on Cloudflare (~$10/yr) removes this step
+entirely; see Step 2.
 
 ---
 

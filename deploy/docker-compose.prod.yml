@@ -46,7 +46,14 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in deploy/.env}
+    # Defaults to a quick tunnel: no domain, no token, free — but Cloudflare
+    # assigns a RANDOM *.trycloudflare.com hostname that changes every time this
+    # container restarts. Read the current one with deploy/tunnel-url.sh.
+    #
+    # Once a domain is on Cloudflare, create a named tunnel and set this in
+    # deploy/.env for a permanent hostname instead:
+    #   CLOUDFLARED_CMD=tunnel --no-autoupdate run --token <token>
+    command: ${CLOUDFLARED_CMD:-tunnel --no-autoupdate --url http://api:8000}
     depends_on:
       - api
 
