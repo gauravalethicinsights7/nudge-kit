@@ -1,204 +1,154 @@
 # Deploying NUDGE Omnichannel
 
-**Frontend** → Cloudflare Pages (free).
-**Backend** → Oracle Cloud Always Free VM, reached through a free Cloudflare Tunnel.
-
-The backend cannot run on Cloudflare Pages or Workers: it needs PyMC (compiles C
-via PyTensor at runtime), cvxpy, psycopg against Postgres with pgvector, and
-module runs that take minutes. Workers run Pyodide with a hard CPU ceiling and
-have no Postgres. The tunnel is what keeps the public surface on Cloudflare
-anyway — the API answers on a Cloudflare hostname, with no inbound port open on
-the VM.
+| Layer | Host | Cost |
+|---|---|---|
+| Frontend (React SPA) | **Vercel** | Free |
+| Backend (FastAPI + M1–M8 engine) | **Hugging Face Spaces** (Docker) | Free |
+| Database (Postgres + pgvector) | **Supabase** | Free |
 
 ```
-Browser ─► Cloudflare Pages (static SPA)
-              └─ fetch ─► api.yourdomain.com ─► Cloudflare Tunnel ─► Oracle VM
-                                                                      ├─ api (FastAPI)
-                                                                      └─ postgres + pgvector
+Browser ─► Vercel (static SPA) ─fetch─► HF Space (FastAPI) ─► Supabase (Postgres + pgvector)
 ```
+
+The backend cannot be serverless. It carries 577 MB of dependencies (llvmlite,
+scipy, pandas, sklearn, PyMC, cvxpy) against Vercel's 250 MB function limit,
+PyTensor compiles C at runtime, and M1/M4/M5 runs take minutes against a 60s
+function ceiling. It needs a real container — hence Spaces.
+
+Because the data lives in Supabase the backend is **stateless**: the Space can
+sleep, restart, or be replaced entirely without losing anything.
 
 ---
 
-## 0. Prerequisites
+## 1. Supabase — the database
 
-- A Cloudflare account (free).
-- **A domain on Cloudflare.** A named tunnel needs a zone in your account to
-  attach a hostname to. Without one, see [No domain?](#no-domain) below.
-- An Oracle Cloud account. Always Free needs a card to verify identity; the
-  Ampere A1 shape used here is free indefinitely and is not charged.
+1. [supabase.com](https://supabase.com) → **New project**. Pick the region
+   closest to you and set a strong database password.
+2. Wait for provisioning (~2 min).
+3. **Connect** (top bar) → **Session pooler** → copy the URI.
 
----
+   Use **Session pooler**, not Transaction pooler and not Direct:
+   - *Direct* is IPv6-only, and the Space is IPv4.
+   - *Transaction* (port 6543) breaks Alembic's DDL and psycopg's prepared
+     statements.
+   - *Session* (port 5432) is IPv4 and behaves like a normal connection.
 
-## 1. Create the Oracle VM
+4. Convert it to SQLAlchemy's driver form — insert `+psycopg` after
+   `postgresql`, and substitute your real password:
 
-Oracle Cloud console → **Compute → Instances → Create instance**:
+   ```
+   postgresql+psycopg://postgres.abcdefgh:YOUR-PASSWORD@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require
+   ```
 
-| Setting | Value |
-|---|---|
-| Image | Ubuntu 22.04 or 24.04 |
-| Shape | **VM.Standard.A1.Flex** (Ampere, arm64) |
-| OCPUs / memory | 2 OCPU / 12 GB (within the 4 OCPU / 24 GB always-free allowance) |
-| SSH key | Upload your public key |
+   Keep this; it becomes `DATABASE_URL`.
 
-If the A1 shape reports "out of capacity", retry in another availability domain
-or region — it is a known Always Free constraint, not an account problem.
-
-Note the public IP, then:
-
-```bash
-ssh ubuntu@<vm-public-ip>
-```
-
-No inbound ports need opening. `cloudflared` dials out to Cloudflare, so the
-VM's default closed firewall is correct and should stay that way.
+pgvector needs no manual step — migration `0001` runs
+`CREATE EXTENSION IF NOT EXISTS vector`, which Supabase permits.
 
 ---
 
-## 2. The Cloudflare Tunnel
+## 2. Hugging Face Space — the backend
 
-**No domain (default).** Nothing to set up in the dashboard — compose runs a
-free quick tunnel automatically. After Step 4 read the assigned URL with:
+1. [huggingface.co/new-space](https://huggingface.co/new-space)
+   - Space name: `nudge-api`
+   - SDK: **Docker** → *Blank*
+   - Visibility: **Public** (free tier; nothing secret ships in the image —
+     all secrets are injected as environment variables)
+2. **Settings → Variables and secrets** → add each as a **Secret**:
 
-```bash
-bash deploy/tunnel-url.sh      # -> https://<random>.trycloudflare.com
-```
+   | Name | Value |
+   |---|---|
+   | `DATABASE_URL` | the Supabase session-pooler URI from Step 1 |
+   | `ANTHROPIC_API_KEY` | your key |
+   | `SERPER_API_KEY` | your key |
+   | `NUDGE_JWT_SECRET` | `python3 -c "import secrets; print(secrets.token_hex(32))"` |
+   | `CORS_ORIGINS` | your Vercel URL — fill in after Step 3 |
 
-That hostname changes every time the `cloudflared` container restarts. When it
-does, rebuild the frontend with the new value (Step 5) — the API's CORS config
-is keyed to your *Pages* URL, which is stable, so only the frontend needs it.
+3. Push the code to the Space (it's a git remote):
 
-**With a domain** (upgrade later, removes the churn): Cloudflare dashboard →
-**Zero Trust → Networks → Tunnels → Create a tunnel**, type **Cloudflared**,
-name it `nudge-api`. Copy the token from the install screen into `deploy/.env`
-as `CLOUDFLARED_CMD=tunnel --no-autoupdate run --token <token>`, then under
-**Public Hostname** add subdomain `api`, your domain, service **HTTP**, URL
-`api:8000` (`api` is the compose service name, resolved on the internal
-network — which is why nothing is published to the host).
+   ```bash
+   git remote add space https://huggingface.co/spaces/<your-username>/nudge-api
+   git push space main
+   ```
 
----
+   Authenticate with a **write** access token from
+   [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) as
+   the password.
 
-## 3. Get the code onto the VM
+4. Watch the **Logs** tab. First build is 10–20 minutes. It's ready when the
+   log shows `Uvicorn running on http://0.0.0.0:8000`, preceded by the Alembic
+   migrations applying against Supabase.
 
-With a Git remote (recommended — also enables Pages auto-deploy):
+Your API base URL is:
+`https://<your-username>-nudge-api.hf.space`
 
-```bash
-git clone https://github.com/<you>/nudge-kit.git && cd nudge-kit
-```
+Verify: `curl https://<your-username>-nudge-api.hf.space/system/status`
 
-Without one, from your laptop:
-
-```bash
-rsync -av --exclude .venv --exclude node_modules --exclude var/uploads \
-  ~/Desktop/nudge-kit/ ubuntu@<vm-public-ip>:~/nudge-kit/
-```
-
----
-
-## 4. Configure and start the backend
-
-On the VM:
-
-```bash
-cd ~/nudge-kit
-cp deploy/.env.example deploy/.env
-nano deploy/.env        # fill in every blank — see the comments in the file
-bash deploy/setup-oracle.sh
-```
-
-`setup-oracle.sh` installs Docker, adds 4 GB of swap, and brings up
-postgres + api + cloudflared. The first arm64 build takes 10–20 minutes
-(PyMC and cvxpy compile from source). Alembic migrations run automatically on
-every container start.
-
-Set `CORS_ORIGINS` in `deploy/.env` to your Pages URL before starting, or the
-browser will block the frontend's requests.
-
-Check it:
-
-```bash
-sudo docker compose -f deploy/docker-compose.prod.yml logs -f api
-bash deploy/tunnel-url.sh                      # your public API URL
-curl "$(bash deploy/tunnel-url.sh)/system/status"
-```
+> Free Spaces sleep after ~48h idle and cold-start in ~30s. Data is unaffected
+> — it's in Supabase, and uploads are stored in the database too (see
+> `api/uploads_store.py`), not on the Space's ephemeral disk.
 
 ---
 
-## 5. Deploy the frontend to Cloudflare Pages
+## 3. Vercel — the frontend
 
-### From a Git repo (auto-deploys on push)
+1. [vercel.com/new](https://vercel.com/new) → import the GitHub repo
+2. Set:
 
-Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git**:
+   | Setting | Value |
+   |---|---|
+   | Root Directory | `frontend` |
+   | Framework Preset | Vite (auto-detected) |
+   | Environment Variable | `VITE_API_BASE_URL` = `https://<your-username>-nudge-api.hf.space` |
 
-| Setting | Value |
-|---|---|
-| Root directory | `frontend` |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Environment variable | `VITE_API_BASE_URL` = `https://api.yourdomain.com` |
+3. **Deploy.**
+4. Copy the resulting URL (e.g. `https://nudge-kit.vercel.app`), go back to the
+   Space's secrets, and set `CORS_ORIGINS` to it. The Space restarts
+   automatically.
 
-### Direct upload (no Git)
-
-```bash
-cd frontend
-VITE_API_BASE_URL=https://api.yourdomain.com npm run deploy
-```
-
-Either way `public/_redirects` ships the SPA fallback, so deep links like
+`frontend/vercel.json` handles the SPA rewrite, so deep links like
 `/brands/<id>/brand-plan` resolve instead of 404ing.
 
-> `VITE_API_BASE_URL` is inlined at **build** time. Changing it in the Pages
-> dashboard requires a redeploy — a refresh will not pick it up.
+> `VITE_API_BASE_URL` is inlined at **build** time. Changing it in Vercel
+> requires a redeploy, not just a refresh.
 
 ---
 
-## 6. Create the first account
+## 4. First account
 
-The demo login is seeded on your local database, not the server's. On the
-deployed site use **Create a workspace** to sign up; that account becomes the
-tenant's platform admin.
+The local demo login is not in the Supabase database. On the deployed site use
+**Create a workspace** — that account becomes the tenant's platform admin.
 
 ---
 
 ## Redeploying
 
-Backend (on the VM):
-
-```bash
-cd ~/nudge-kit && git pull
-sudo docker compose -f deploy/docker-compose.prod.yml up -d --build
-```
-
-Frontend: push to the connected branch, or re-run `npm run deploy`.
-
----
-
-## When the tunnel URL changes
-
-On a quick tunnel, restarting `cloudflared` (or rebooting the VM) assigns a new
-hostname. To recover:
-
-```bash
-# on the VM
-bash deploy/tunnel-url.sh
-
-# on your laptop
-cd frontend
-VITE_API_BASE_URL=<new-url> npm run deploy
-```
-
-`CORS_ORIGINS` does not need touching — it lists the frontend's Pages origin,
-which never changes. A domain on Cloudflare (~$10/yr) removes this step
-entirely; see Step 2.
-
----
-
-## Costs
-
-| Piece | Cost |
+| Change | Action |
 |---|---|
-| Cloudflare Pages | Free (unlimited requests, 500 builds/mo) |
-| Cloudflare Tunnel | Free |
-| Oracle Ampere A1 VM | Free (Always Free tier) |
-| Postgres + pgvector | Free (container on the VM) |
-| Domain | ~$10/yr, only piece that is not free |
-| Anthropic + Serper API | Metered by usage; capped per run by `NUDGE_RUN_BUDGET_USD` |
+| Frontend | `git push origin main` — Vercel builds automatically |
+| Backend | `git push space main` — the Space rebuilds automatically |
+| Schema | Add an Alembic revision; it applies on the next Space start |
+
+---
+
+## Preview deployments and CORS
+
+Vercel gives every branch and PR its own URL. To let those reach the API, set
+`CORS_ORIGIN_REGEX` on the Space instead of listing them:
+
+```
+^https://nudge-kit-[a-z0-9-]+\.vercel\.app$
+```
+
+---
+
+## Upgrading later
+
+The pieces are independent, so each can be replaced without touching the others:
+
+- **Backend → Oracle Cloud Always Free** (or any container host): point it at
+  the same `DATABASE_URL` and repoint `VITE_API_BASE_URL`. No data migration —
+  that's the benefit of keeping state in Supabase. `deploy/` still holds the
+  compose stack and provisioning script for that path.
+- **Supabase free tier** pauses a project after 7 days with no activity; open
+  the dashboard to resume, or upgrade if the demo needs to stay warm.

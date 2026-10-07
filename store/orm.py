@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -641,5 +641,24 @@ class JobORM(OrmBase):
     message: Mapped[str | None] = mapped_column(String, nullable=True)
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class UploadORM(OrmBase):
+    """Uploaded Data Hub files, stored as bytes in the database rather than on
+    disk. The engine re-reads these on every module run, and the API now runs
+    on hosts with an ephemeral filesystem — a container restart would
+    otherwise silently drop every upload and break M2/M6/M7/M8 until the user
+    noticed and re-uploaded. See api/uploads_store.py, which still hands
+    callers a Path by materializing the bytes into a local cache."""
+
+    __tablename__ = "upload"
+
+    brand_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("brand.id"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(50), primary_key=True)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

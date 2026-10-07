@@ -1,3 +1,13 @@
+---
+title: NUDGE Omnichannel API
+emoji: 💊
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # NUDGE Omnichannel — Claude Code build kit
 
 | File | Purpose | When Claude Code reads it |
