@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Activity, FileText, Lightbulb, TrendingDown } from "lucide-react";
-import { useMarketLandscape, useRunM1, useSystemStatus } from "../api/hooks";
+import { useMarketLandscape, useQuestionBank, useRunM1, useSystemStatus } from "../api/hooks";
 import { RunButton } from "../components/RunButton";
 import { EvidenceChip } from "../components/Badge";
 import { ChartCard } from "../components/charts/ChartCard";
@@ -9,6 +9,7 @@ import { FunnelChart } from "../components/charts/FunnelChart";
 import { SkeletonKpiRow } from "../components/Skeleton";
 import { DetailModal } from "../components/shared/DetailModal";
 import { StageHeader } from "../components/shared/StageHeader";
+import { QuestionBankPanel } from "../components/shared/QuestionBankPanel";
 import {
   Figure,
   HowCalculated,
@@ -31,6 +32,7 @@ export function MarketLandscape() {
   const { brandId } = useParams();
   const { data: landscape, isLoading } = useMarketLandscape(brandId);
   const { data: status } = useSystemStatus();
+  const { data: questionBank } = useQuestionBank(brandId);
   const runM1 = useRunM1(brandId);
   const [openFact, setOpenFact] = useState<number | null>(null);
   const [paradigmOpen, setParadigmOpen] = useState(false);
@@ -95,6 +97,8 @@ export function MarketLandscape() {
           />
         }
       />
+
+      {questionBank && <QuestionBankPanel data={questionBank} />}
 
       {isLoading && <SkeletonKpiRow count={2} />}
       {!isLoading && !landscape && (

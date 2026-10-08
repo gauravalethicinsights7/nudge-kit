@@ -25,6 +25,7 @@ import type {
   Outcome,
   Pack,
   Persona,
+  QuestionBankCoverage,
   PilotPair,
   PriorUpdate,
   ResearchGap,
@@ -203,6 +204,14 @@ export function useEvidence(brandId: string | undefined) {
     enabled: !!brandId,
   });
 }
+export function useQuestionBank(brandId: string | undefined) {
+  return useQuery({
+    queryKey: ["question-bank", brandId],
+    queryFn: () => api.get<QuestionBankCoverage>(`/brands/${brandId}/m1/question-bank`),
+    enabled: !!brandId,
+  });
+}
+
 export function useResearchGaps(brandId: string | undefined) {
   return useQuery({
     queryKey: ["research-gaps", brandId],

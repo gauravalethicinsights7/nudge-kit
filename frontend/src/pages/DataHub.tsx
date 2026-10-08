@@ -6,6 +6,7 @@ import { useUploadFile, useUploads } from "../api/hooks";
 import { ApiError } from "../api/client";
 import { Badge, Card, MetricStat, MicroLabel } from "../components/shared/ui";
 import { StageHeader } from "../components/shared/StageHeader";
+import { DataLevelPanel } from "../components/shared/DataLevelPanel";
 
 const KINDS: { kind: string; label: string; hint: string; accept: string }[] = [
   { kind: "hcp_sample", label: "HCP sample", hint: "CSV: crm_id, specialty, setting, state, city, city_tier, territory_id, access, consent_email, consent_whatsapp", accept: ".csv" },
@@ -108,6 +109,8 @@ export function DataHub() {
           <MetricStat label="File types" value={KINDS.length} sub="Supported by the engine" />
         </Card>
       </div>
+
+      <DataLevelPanel uploads={uploads} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
         {KINDS.map((k) => (

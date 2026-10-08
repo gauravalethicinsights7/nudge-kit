@@ -95,6 +95,27 @@ export interface ResearchGap extends Base {
   notes: string | null;
 }
 
+export interface QuestionCoverage {
+  question: string;
+  status: "answered" | "partial" | "gap";
+  best_confidence: number | null;
+}
+
+export interface QuestionBlockCoverage {
+  block: string;
+  questions: QuestionCoverage[];
+}
+
+export interface QuestionBankCoverage {
+  blocks: QuestionBlockCoverage[];
+  threshold: number;
+  total: number;
+  answered: number;
+  partial: number;
+  gap: number;
+  has_run: boolean;
+}
+
 export interface Segment extends Base {
   brand_id: string;
   name: string;
