@@ -19,10 +19,10 @@ import {
   Card,
   EmptyState,
   MetricStat,
-  SectionHeading,
   StepHeading,
   TableWrap,
 } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 
 const RUNGS = ["unaware", "aware", "considering", "trialist", "adopter", "advocate", "lapsed"];
 
@@ -66,11 +66,7 @@ export function Measurement() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="M8 · Act and learn"
-        title="Measurement"
-        sub="Engagement index and scorecard versus plan, causal lift tests, prior recalibration and assumption review."
-      />
+      <StageHeader stageId="m8" />
 
       {scorecard && (
         <div className="grid grid-4" style={{ marginBottom: 22 }}>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { Activity, FileText, Lightbulb, TrendingUp } from "lucide-react";
+import { Activity, FileText, Lightbulb, TrendingDown } from "lucide-react";
 import { useMarketLandscape, useRunM1, useSystemStatus } from "../api/hooks";
 import { RunButton } from "../components/RunButton";
 import { EvidenceChip } from "../components/Badge";
@@ -8,18 +8,24 @@ import { ChartCard } from "../components/charts/ChartCard";
 import { FunnelChart } from "../components/charts/FunnelChart";
 import { SkeletonKpiRow } from "../components/Skeleton";
 import { DetailModal } from "../components/shared/DetailModal";
+import { StageHeader } from "../components/shared/StageHeader";
+import {
+  Figure,
+  HowCalculated,
+  ProvenanceChip,
+  gradeOf,
+} from "../components/shared/provenance";
 import {
   AccentCallout,
-  Badge,
   BulletList,
   Card,
-  ConfidencePill,
   EmptyState,
   Field,
-  MetricStat,
-  SectionHeading,
 } from "../components/shared/ui";
 import { normalizeBullets, toBullets } from "../lib/bullets";
+import type { ProvNumber } from "../api/types";
+
+const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 1 });
 
 export function MarketLandscape() {
   const { brandId } = useParams();
@@ -36,24 +42,49 @@ export function MarketLandscape() {
     : null;
 
   const funnel = landscape?.patient_funnel;
-  const funnelData = funnel
-    ? [
-        { name: "Prevalent", value: funnel.prevalent?.value ?? 0 },
-        { name: "Diagnosed", value: funnel.diagnosed?.value ?? 0 },
-        { name: "Treated", value: funnel.treated?.value ?? 0 },
-        { name: "Controlled", value: funnel.controlled?.value ?? 0 },
-      ].filter((d) => d.value > 0)
-    : [];
+  const stages: { name: string; p: ProvNumber | null }[] = [
+    { name: "Prevalent", p: funnel?.prevalent ?? null },
+    { name: "Diagnosed", p: funnel?.diagnosed ?? null },
+    { name: "Treated", p: funnel?.treated ?? null },
+    { name: "Controlled", p: funnel?.controlled ?? null },
+  ];
+  const funnelData = stages
+    .filter((s) => (s.p?.value ?? 0) > 0)
+    .map((s) => ({ name: s.name, value: s.p!.value }));
+
+  // The absolute numbers are the easy part; the drop between stages is where
+  // the decision lives. Computed here rather than asserted, so each step can
+  // be checked against the two figures it came from.
+  const steps = stages
+    .map((s, i) => ({ from: stages[i - 1], to: s }))
+    .filter((x) => x.from?.p?.value && x.to.p?.value)
+    .map((x) => {
+      const pct = (x.to.p!.value / x.from!.p!.value) * 100;
+      return {
+        label: `${x.from!.name} → ${x.to.name}`,
+        from: x.from!.p!,
+        to: x.to.p!,
+        pct,
+        // A funnel stage cannot be larger than the one above it. When the two
+        // extracted figures imply that, the units disagree (one source in
+        // millions, another a percentage) — say so rather than printing a
+        // 650% "conversion" as though it were a finding.
+        inconsistent: pct > 100,
+      };
+    });
+  const validSteps = steps.filter((s) => !s.inconsistent);
+  const worstStep = validSteps.length
+    ? validSteps.reduce((a, b) => (a.pct <= b.pct ? a : b))
+    : null;
+  const inconsistentSteps = steps.filter((s) => s.inconsistent);
 
   const unmetNeeds = normalizeBullets(landscape?.unmet_needs ?? []);
   const fact = openFact !== null ? landscape?.key_facts[openFact] : null;
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="M1 · Understand the market"
-        title="Market Landscape"
-        sub="Patient funnel, market size and unmet needs — discovered by the research agent, every fact carrying evidence."
+      <StageHeader
+        stageId="m1"
         right={
           <RunButton
             label="Run M1 (research)"
@@ -71,13 +102,35 @@ export function MarketLandscape() {
           <EmptyState
             icon={<Activity size={28} strokeWidth={1.6} />}
             title="No market landscape yet"
-            sub="Run the research agent once both API keys are configured — it searches, extracts evidence, and synthesizes the patient funnel, market size, and unmet needs."
+            sub="Run the research agent once both API keys are configured. It searches, opens each source, extracts single facts, scores each one's confidence, and leaves a gap where nothing reached the bar rather than guessing."
           />
         </Card>
       )}
 
       {landscape && (
         <>
+          {worstStep && (
+            <AccentCallout tone="navy" label="Where the market leaks most" style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)", marginBottom: 4 }}>
+                Only {worstStep.pct.toFixed(1)}% of{" "}
+                {worstStep.label.split(" → ")[0].toLowerCase()} patients reach{" "}
+                {worstStep.label.split(" → ")[1].toLowerCase()}.
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--text-3)" }}>
+                The steepest drop in the funnel — the stage where effort returns the most patients.
+              </div>
+              <HowCalculated
+                formula="Conversion = patients at this stage ÷ patients at the stage before, × 100."
+                steps={[
+                  { label: worstStep.label.split(" → ")[0], value: fmt(worstStep.from.value) },
+                  { label: worstStep.label.split(" → ")[1], value: fmt(worstStep.to.value) },
+                ]}
+                result={`${worstStep.pct.toFixed(1)}%`}
+                note="Both figures carry their own source and confidence — open the funnel card to see them."
+              />
+            </AccentCallout>
+          )}
+
           <div
             style={{
               display: "grid",
@@ -95,43 +148,116 @@ export function MarketLandscape() {
               emptyMessage="No funnel data extracted yet."
             >
               <FunnelChart data={funnelData} valueFormatter={(v) => v.toLocaleString()} />
+              {steps.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 14,
+                    paddingTop: 12,
+                    borderTop: "1px solid var(--border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  {steps.map((s) => (
+                    <div
+                      key={s.label}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                        fontSize: 12.5,
+                      }}
+                    >
+                      <span style={{ color: "var(--text-2)" }}>{s.label}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <ProvenanceChip
+                          grade={gradeOf(s.to.origin)}
+                          prov={s.to}
+                          compact
+                        />
+                        {s.inconsistent ? (
+                          <span
+                            title={`${s.from.value} then ${s.to.value} — a later stage cannot be larger. Sources: ${s.from.source} / ${s.to.source}`}
+                            style={{
+                              fontWeight: 700,
+                              color: "var(--amber-text)",
+                              minWidth: 46,
+                              textAlign: "right",
+                              cursor: "help",
+                            }}
+                          >
+                            units ?
+                          </span>
+                        ) : (
+                          <span
+                            className="tabular"
+                            style={{
+                              fontWeight: 700,
+                              color: s === worstStep ? "var(--red-text)" : "var(--navy)",
+                              minWidth: 46,
+                              textAlign: "right",
+                            }}
+                          >
+                            {s.pct.toFixed(1)}%
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                  {inconsistentSteps.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 11.5,
+                        lineHeight: 1.55,
+                        color: "var(--amber-text)",
+                        background: "var(--amber-bg)",
+                        borderRadius: "var(--radius-sm)",
+                        padding: "8px 10px",
+                      }}
+                    >
+                      {inconsistentSteps.length === 1 ? "One step is" : `${inconsistentSteps.length} steps are`}{" "}
+                      larger than the stage above, so the two sources are not on the same unit. Shown
+                      as unresolved rather than converted — re-run M1 or correct the source figures.
+                    </div>
+                  )}
+                </div>
+              )}
             </ChartCard>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <Card style={{ margin: 0 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                  <MetricStat
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+                  <Figure
                     label="Market size"
-                    value={landscape.market_size ? landscape.market_size.value.toLocaleString() : "–"}
-                    sub={landscape.market_size?.currency ?? undefined}
+                    value={landscape.market_size ? fmt(landscape.market_size.value) : "–"}
+                    unit={landscape.market_size?.currency}
+                    grade={landscape.market_size ? gradeOf(landscape.market_size.origin) : undefined}
+                    prov={landscape.market_size ?? undefined}
+                    sub={
+                      landscape.market_size?.low != null && landscape.market_size?.high != null
+                        ? `Sources disagree — range ${fmt(landscape.market_size.low)}–${fmt(landscape.market_size.high)}, kept as a range rather than averaged`
+                        : landscape.market_size
+                        ? `Source: ${landscape.market_size.source}`
+                        : undefined
+                    }
                   />
-                  <MetricStat
+                  <Figure
                     label="Growth"
                     value={landscape.growth_pct ? `${landscape.growth_pct.value}%` : "–"}
-                    sub={landscape.growth_pct ? "CAGR" : undefined}
+                    unit={landscape.growth_pct ? "CAGR" : undefined}
                     tone="gold"
+                    grade={landscape.growth_pct ? gradeOf(landscape.growth_pct.origin) : undefined}
+                    prov={landscape.growth_pct ?? undefined}
                   />
                 </div>
-                {landscape.market_size && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      flexWrap: "wrap",
-                      marginTop: 14,
-                      paddingTop: 12,
-                      borderTop: "1px solid var(--border)",
-                    }}
-                  >
-                    <Badge color="navySoft">{landscape.market_size.origin}</Badge>
-                    <Badge color="neutral">As of {landscape.market_size.as_of}</Badge>
-                    <ConfidencePill level={landscape.market_size.confidence} />
-                  </div>
-                )}
               </Card>
 
               <Card
                 title="Paradigm"
+                sub="Where the brand sits in today's treatment sequence"
                 clickable={!!landscape.paradigm}
                 onClick={() => setParadigmOpen(true)}
                 style={{ margin: 0, flex: 1 }}
@@ -196,13 +322,7 @@ export function MarketLandscape() {
                           i === landscape.key_facts.length - 1 ? "none" : "1px solid var(--border)",
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 10,
-                          alignItems: "flex-start",
-                        }}
-                      >
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                         <FileText
                           size={13}
                           strokeWidth={2}
@@ -221,7 +341,7 @@ export function MarketLandscape() {
                   ))}
                 </div>
               ) : (
-                <EmptyState icon={<TrendingUp size={24} strokeWidth={1.6} />} sub="None recorded." />
+                <EmptyState icon={<TrendingDown size={24} strokeWidth={1.6} />} sub="None recorded." />
               )}
             </Card>
           </div>

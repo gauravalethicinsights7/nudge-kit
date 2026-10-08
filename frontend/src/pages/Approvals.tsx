@@ -12,9 +12,9 @@ import {
   Card,
   EmptyState,
   MetricStat,
-  SectionHeading,
   TableWrap,
 } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 
 function EntityRows({ brandId, entityType }: { brandId: string; entityType: string }) {
   const { data: rows, isLoading } = useDraftRows(brandId, entityType);
@@ -98,11 +98,7 @@ export function Approvals() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="Governance"
-        title="Approvals Inbox"
-        sub="Every module output moves from draft to approved before downstream modules read it. Approve individually or in bulk — the server enforces the role check."
-      />
+      <StageHeader stageId="appr" />
 
       <div className="grid grid-3" style={{ marginBottom: 22 }}>
         <Card style={{ margin: 0 }}>

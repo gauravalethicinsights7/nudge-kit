@@ -4,7 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, RefreshCw, Upload } from "lucide-react";
 import { useUploadFile, useUploads } from "../api/hooks";
 import { ApiError } from "../api/client";
-import { Badge, Card, MetricStat, MicroLabel, SectionHeading } from "../components/shared/ui";
+import { Badge, Card, MetricStat, MicroLabel } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 
 const KINDS: { kind: string; label: string; hint: string; accept: string }[] = [
   { kind: "hcp_sample", label: "HCP sample", hint: "CSV: crm_id, specialty, setting, state, city, city_tier, territory_id, access, consent_email, consent_whatsapp", accept: ".csv" },
@@ -81,11 +82,9 @@ export function DataHub() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="Data foundation"
-        title="Data Hub"
-        sub="HCP, sales and content-library files are re-read from the file you upload here every time a module runs."
-        right={
+      <StageHeader
+        stageId="data"
+                right={
           <button className="btn-ghost" onClick={() => qc.invalidateQueries({ queryKey: ["uploads", brandId] })}>
             <RefreshCw size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />
             Refresh

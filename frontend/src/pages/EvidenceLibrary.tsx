@@ -14,8 +14,8 @@ import {
   EmptyState,
   MetricStat,
   Pill,
-  SectionHeading,
 } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 import type { Evidence } from "../api/types";
 
 const columns = [
@@ -68,11 +68,7 @@ export function EvidenceLibrary() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="M1 · Understand the market"
-        title="Evidence Library"
-        sub="Every claim the research agent generated, carrying a source, origin, as-of date and confidence."
-      />
+      <StageHeader stageId="evidence" />
 
       {!!evidence?.length && (
         <>

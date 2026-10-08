@@ -1,19 +1,19 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowRight, CircleDot } from "lucide-react";
+import { ArrowRight, CircleDot, ShieldAlert } from "lucide-react";
 import {
-  useBrand, useMarketLandscape, useSegments, usePersonas, useCompetitors,
+  useMarketLandscape, useSegments, usePersonas, useCompetitors,
   useBrandPlan, useChannelPlan, useActions, useScorecard, useApprovals,
 } from "../api/hooks";
 import { SkeletonKpiRow } from "../components/Skeleton";
-import {
-  AccentCallout,
-  Badge,
-  BulletList,
-  Card,
-  MetricStat,
-  SectionHeading,
-} from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
+import { Figure, HowCalculated } from "../components/shared/provenance";
+import { AccentCallout, Badge, Card, MicroLabel } from "../components/shared/ui";
+import { STAGES, stageById } from "../domain/stages";
+import { fmtMoney, fmtMoneyExact } from "../lib/format";
 
+/** Which stages actually produced something. Separate from the rail's
+ *  "nothing waiting for sign-off" — this is the one place that queries each
+ *  module, so it is the only place that can honestly say "has data". */
 function ModuleCard({ to, title, ready, detail }: { to: string; title: string; ready: boolean; detail: string }) {
   return (
     <Link
@@ -34,20 +34,10 @@ function ModuleCard({ to, title, ready, detail }: { to: string; title: string; r
   );
 }
 
-const STEPS: { key: string; title: string; to: string; ready: (d: Record<string, unknown>) => boolean }[] = [
-  { key: "landscape", title: "Market landscape", to: "market-landscape", ready: (d) => !!d.landscape },
-  { key: "segments", title: "Segments", to: "segments", ready: (d) => !!(d.segments as unknown[])?.length },
-  { key: "personas", title: "Personas", to: "personas", ready: (d) => !!(d.personas as unknown[])?.length },
-  { key: "competitive", title: "Competitive map", to: "competitive", ready: (d) => !!(d.competitors as unknown[])?.length },
-  { key: "plan", title: "Brand plan", to: "brand-plan", ready: (d) => !!d.plan },
-  { key: "channel", title: "Channel plan", to: "channel-planner", ready: (d) => !!d.channelPlan },
-  { key: "actions", title: "Orchestration", to: "orchestration", ready: (d) => !!(d.actions as unknown[])?.length },
-  { key: "measure", title: "Measurement", to: "measurement", ready: (d) => !!d.scorecard },
-];
+const PIPELINE = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"];
 
 export function BrandOverview() {
   const { brandId } = useParams();
-  const { data: brand } = useBrand(brandId);
   const { data: landscape, isLoading: landscapeLoading } = useMarketLandscape(brandId);
   const { data: segments, isLoading: segmentsLoading } = useSegments(brandId);
   const { data: personas } = usePersonas(brandId);
@@ -58,57 +48,117 @@ export function BrandOverview() {
   const { data: scorecard } = useScorecard(brandId);
   const { data: approvals, isLoading: approvalsLoading } = useApprovals(brandId);
 
+  const ready: Record<string, boolean> = {
+    m1: !!landscape,
+    m2: !!segments?.length,
+    m3: !!personas?.length,
+    m4: !!competitors?.length,
+    m5: !!plan,
+    m6: !!channelPlan,
+    m7: !!actions?.length,
+    m8: !!scorecard,
+  };
+
   const pendingApprovals = approvals?.reduce((sum, a) => sum + a.draft_count, 0) ?? 0;
   const topSegment = segments?.length
     ? [...segments].sort((a, b) => b.total_potential - a.total_potential)[0]
     : null;
 
-  const stepData = { landscape, segments, personas, competitors, plan, channelPlan, actions, scorecard };
-  const completedSteps = STEPS.filter((s) => s.ready(stepData));
-  const nextStep = STEPS.find((s) => !s.ready(stepData));
+  const done = PIPELINE.filter((id) => ready[id]);
+  const nextId = PIPELINE.find((id) => !ready[id]);
+  const next = nextId ? stageById(nextId) : undefined;
+  const progressPct = Math.round((done.length / PIPELINE.length) * 100);
   const isLoading = landscapeLoading || segmentsLoading || approvalsLoading;
-  const progressPct = Math.round((completedSteps.length / STEPS.length) * 100);
+
+  // The one-line answer to "what is this plan worth, and how sure are we?"
+  const baseRevenue = plan?.forecast.base.revenue;
+  const spreadPct = plan
+    ? ((plan.forecast.upside.revenue.value - plan.forecast.downside.revenue.value) /
+        Math.max(plan.forecast.base.revenue.value, 1)) * 100
+    : 0;
+  const blockers = plan?.compliance_flags.filter((f) => f.severity === "block") ?? [];
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="Command centre"
-        title={brand?.name ?? "Brand"}
-        sub="Understand the market → Know the doctors → Decide the plan → Act and learn."
+      <StageHeader
+        stageId="overview"
         right={
-          nextStep ? (
-            <Link to={nextStep.to} className="btn btn-gold">
-              Continue: {nextStep.title}
+          next ? (
+            <Link to={next.route} className="btn btn-gold">
+              Continue: {next.label}
               <ArrowRight size={14} style={{ marginLeft: 6, verticalAlign: "-2px" }} />
             </Link>
           ) : undefined
         }
       />
 
+      {blockers.length > 0 && (
+        <AccentCallout
+          tone="red"
+          label="This plan cannot be activated yet"
+          icon={<ShieldAlert size={12} />}
+          style={{ marginBottom: 18 }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {blockers.map((f, i) => (
+              <div key={i} style={{ fontSize: 13, lineHeight: 1.55 }}>{f.item}</div>
+            ))}
+          </div>
+        </AccentCallout>
+      )}
+
       {isLoading ? (
         <SkeletonKpiRow count={4} />
       ) : (
         <div className="grid grid-4" style={{ marginBottom: 22 }}>
           <Card style={{ margin: 0 }}>
-            <MetricStat
-              label="Segments"
-              value={segments?.length ?? 0}
+            <Figure
+              label="Plan worth / year"
+              value={baseRevenue ? fmtMoney(baseRevenue.value, baseRevenue.currency) : "–"}
+              unit={baseRevenue?.currency}
+              tone="gold"
+              sub={
+                baseRevenue
+                  ? `±${spreadPct.toFixed(0)}% between downside and upside`
+                  : "Run the brand plan to forecast"
+              }
+              calc={
+                baseRevenue ? (
+                  <HowCalculated
+                    formula="Doctors in journeys → doctors trying → patients on therapy → revenue at the monthly price over twelve months."
+                    steps={[
+                      { label: "Downside", value: fmtMoneyExact(plan!.forecast.downside.revenue.value, plan!.forecast.downside.revenue.currency) },
+                      { label: "Base", value: fmtMoneyExact(plan!.forecast.base.revenue.value, plan!.forecast.base.revenue.currency) },
+                      { label: "Upside", value: fmtMoneyExact(plan!.forecast.upside.revenue.value, plan!.forecast.upside.revenue.currency) },
+                    ]}
+                    result={`${fmtMoneyExact(baseRevenue.value, baseRevenue.currency)} ${baseRevenue.currency}`}
+                    note="Open the Brand Plan to see which assumptions carry this number and which still need a test."
+                  />
+                ) : undefined
+              }
+            />
+          </Card>
+          <Card style={{ margin: 0 }}>
+            <Figure
+              label="Doctors prioritised"
+              value={(segments?.reduce((n, s) => n + s.hcp_count, 0) ?? 0).toLocaleString()}
               sub={topSegment ? `Largest: ${topSegment.name}` : undefined}
             />
           </Card>
           <Card style={{ margin: 0 }}>
-            <MetricStat label="Personas" value={personas?.length ?? 0} />
-          </Card>
-          <Card style={{ margin: 0 }}>
-            <MetricStat
-              label="Pending approvals"
-              value={pendingApprovals}
-              sub={pendingApprovals > 0 ? "Awaiting review" : "All clear"}
-              tone={pendingApprovals > 0 ? "red" : "emerald"}
+            <Figure
+              label="Actions this week"
+              value={(actions?.length ?? 0).toLocaleString()}
+              sub="Ranked, guardrail-checked, ready for the CRM"
             />
           </Card>
           <Card style={{ margin: 0 }}>
-            <MetricStat label="Actions (NBA)" value={actions?.length ?? 0} tone="gold" />
+            <Figure
+              label="Waiting on you"
+              value={pendingApprovals.toLocaleString()}
+              tone={pendingApprovals > 0 ? "red" : "emerald"}
+              sub={pendingApprovals > 0 ? "Drafts needing sign-off" : "Nothing outstanding"}
+            />
           </Card>
         </div>
       )}
@@ -131,19 +181,11 @@ export function BrandOverview() {
             Plan progress
           </div>
           <Badge color={progressPct === 100 ? "emerald" : "gold"}>
-            {completedSteps.length} of {STEPS.length} modules
+            {done.length} of {PIPELINE.length} modules
           </Badge>
         </div>
 
-        <div
-          style={{
-            height: 8,
-            borderRadius: 999,
-            background: "var(--bg-raised)",
-            overflow: "hidden",
-            marginBottom: 16,
-          }}
-        >
+        <div style={{ height: 8, borderRadius: 999, background: "var(--bg-raised)", overflow: "hidden", marginBottom: 16 }}>
           <div
             style={{
               width: `${progressPct}%`,
@@ -154,105 +196,53 @@ export function BrandOverview() {
           />
         </div>
 
-        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)", lineHeight: 1.5, marginBottom: 14 }}>
-          {nextStep
-            ? `Next up: ${nextStep.title}.`
-            : "All eight modules have data. The brand plan and activation plan are ready for review."}
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)", lineHeight: 1.5, marginBottom: 6 }}>
+          {next ? `Next up: ${next.label}.` : "All eight modules have data. The plan is ready for review."}
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--text-3)", lineHeight: 1.6, marginBottom: 14 }}>
+          {next ? next.decision : "Every module has produced output. What remains is sign-off and activation."}
         </div>
 
-        {completedSteps.length > 0 && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {completedSteps.map((s) => (
-              <Badge key={s.key} color="emerald">{s.title}</Badge>
-            ))}
-            {STEPS.filter((s) => !s.ready(stepData)).map((s) => (
-              <Badge key={s.key} color="neutral">{s.title}</Badge>
-            ))}
-          </div>
-        )}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {PIPELINE.map((id) => {
+            const s = stageById(id)!;
+            return (
+              <Badge key={id} color={ready[id] ? "emerald" : "neutral"}>
+                {s.ix} {s.label}
+              </Badge>
+            );
+          })}
+        </div>
       </Card>
 
-      <h2 className="section-title">Understand the market</h2>
-      <div className="grid grid-2" style={{ marginBottom: 22 }}>
-        <ModuleCard
-          to={`/brands/${brandId}/market-landscape`}
-          title="Market Landscape (M1)"
-          ready={!!landscape}
-          detail={landscape ? "Patient funnel, market size and unmet needs computed." : "Needs ANTHROPIC_API_KEY and SERPER_API_KEY."}
-        />
-        <ModuleCard
-          to={`/brands/${brandId}/data-hub`}
-          title="Data Hub"
-          ready={false}
-          detail="Upload HCPs, content library, engagement and sales data."
-        />
-      </div>
+      {[...new Set(STAGES.filter((s) => PIPELINE.includes(s.id)).map((s) => s.group))].map((group) => (
+        <div key={group}>
+          <h2 className="section-title">{group}</h2>
+          <div className="grid grid-3" style={{ marginBottom: 22 }}>
+            {STAGES.filter((s) => s.group === group && PIPELINE.includes(s.id)).map((s) => (
+              <ModuleCard
+                key={s.id}
+                to={`/brands/${brandId}/${s.route}`}
+                title={`${s.label} (${s.ix})`}
+                ready={ready[s.id]}
+                detail={s.decision}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
 
-      <h2 className="section-title">Know the doctors</h2>
-      <div className="grid grid-3" style={{ marginBottom: 22 }}>
-        <ModuleCard
-          to={`/brands/${brandId}/segments`}
-          title="Segments & Targeting (M2)"
-          ready={!!segments?.length}
-          detail={segments?.length ? `${segments.length} segments tiered by potential.` : "Upload HCPs, then run M2."}
-        />
-        <ModuleCard
-          to={`/brands/${brandId}/personas`}
-          title="Personas & Journeys (M3)"
-          ready={!!personas?.length}
-          detail={personas?.length ? `${personas.length} personas with drivers and barriers.` : "Needs ANTHROPIC_API_KEY."}
-        />
-        <ModuleCard
-          to={`/brands/${brandId}/competitive`}
-          title="Competitive Map (M4)"
-          ready={!!competitors?.length}
-          detail={competitors?.length ? `${competitors.length} competitors mapped.` : "Needs ANTHROPIC_API_KEY and SERPER_API_KEY."}
-        />
-      </div>
-
-      <h2 className="section-title">Decide the plan</h2>
-      <div className="grid grid-2" style={{ marginBottom: 22 }}>
-        <ModuleCard
-          to={`/brands/${brandId}/brand-plan`}
-          title="Brand Plan (M5)"
-          ready={!!plan}
-          detail={plan ? `${plan.key_issues.length} key issues, ${plan.imperatives.length} imperatives.` : "Needs ANTHROPIC_API_KEY."}
-        />
-        <ModuleCard
-          to={`/brands/${brandId}/channel-planner`}
-          title="Channel Planner (M6)"
-          ready={!!channelPlan}
-          detail={channelPlan ? "Budget allocated across channels." : "Run after segments and personas exist."}
-        />
-      </div>
-
-      <h2 className="section-title">Act and learn</h2>
-      <div className="grid grid-2" style={{ marginBottom: 22 }}>
-        <ModuleCard
-          to={`/brands/${brandId}/orchestration`}
-          title="Orchestration & NBA (M7)"
-          ready={!!actions?.length}
-          detail={actions?.length ? `${actions.length} actions in this run's feed.` : "Upload a content library, then run."}
-        />
-        <ModuleCard
-          to={`/brands/${brandId}/measurement`}
-          title="Measurement (M8)"
-          ready={!!scorecard}
-          detail={scorecard ? `Scorecard for ${scorecard.period}.` : "Run after a brand plan exists."}
-        />
-      </div>
-
-      {pendingApprovals > 0 && (
-        <AccentCallout tone="gold" label="Governance">
-          <BulletList
-            items={[
-              `${pendingApprovals} draft objects are awaiting review.`,
-              "Downstream modules read approved objects only in production.",
-            ]}
-            size={12.5}
-          />
-        </AccentCallout>
-      )}
+      <Card>
+        <MicroLabel>How to read every number in here</MicroLabel>
+        <div style={{ fontSize: 13, lineHeight: 1.7, color: "var(--text-2)", maxWidth: "72ch" }}>
+          The model writes and explains; it never does the arithmetic. Every figure comes from a
+          fixed formula you can open, and carries a chip saying whether it is{" "}
+          <strong>measured</strong> from real data, <strong>estimated</strong> from proxies, or an{" "}
+          <strong>assumption</strong> someone stated. Where two sources disagree, both are kept as a
+          range rather than averaged. Where nothing reached the confidence bar, the gap is left
+          visible instead of filled with a guess.
+        </div>
+      </Card>
     </div>
   );
 }

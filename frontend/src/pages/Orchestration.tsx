@@ -14,9 +14,9 @@ import {
   EmptyState,
   Field,
   MetricStat,
-  SectionHeading,
   TableWrap,
 } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 import type { ContentBrief } from "../api/types";
 
 const PREVIEW_RULES = 12;
@@ -54,11 +54,9 @@ export function Orchestration() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="M7 · Act and learn"
-        title="Orchestration & NBA"
-        sub="A journey rule per segment × persona, then a guardrail-checked weekly top-three next-best-action feed per HCP."
-        right={
+      <StageHeader
+        stageId="m7"
+                right={
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
             <div className="form-row" style={{ margin: 0 }}>
               <label>Rep count</label>

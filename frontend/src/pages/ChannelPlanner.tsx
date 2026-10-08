@@ -7,7 +7,8 @@ import { ChartCard } from "../components/charts/ChartCard";
 import { HeatmapChart } from "../components/charts/HeatmapChart";
 import { StackedBarChart } from "../components/charts/StackedBarChart";
 import { SkeletonTable } from "../components/Skeleton";
-import { Badge, Card, EmptyState, MetricStat, SectionHeading, TableWrap } from "../components/shared/ui";
+import { Badge, Card, EmptyState, MetricStat, TableWrap } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 
 const MAX_HEATMAP_SEGMENTS = 20;
 
@@ -87,11 +88,9 @@ export function ChannelPlanner() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="M6 · Decide the plan"
-        title="Channel Planner"
-        sub="Fit scores per segment × channel, then an optimiser allocates budget and capacity to maximise response subject to caps and compliance."
-        right={
+      <StageHeader
+        stageId="m6"
+                right={
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
             <div className="form-row" style={{ margin: 0 }}>
               <label>Budget envelope</label>

@@ -9,7 +9,7 @@ import type { User, UserRole } from "../api/types";
 // API enforces the real check server-side regardless (api/routers/approvals.py's
 // APPROVER_ROLES), so this map going stale only means a worse error message,
 // never a security gap.
-const APPROVE_PERMISSIONS: Record<UserRole, string[]> = {
+export const APPROVE_PERMISSIONS: Record<UserRole, string[]> = {
   brand_manager: ["market_landscape", "research_gap", "persona", "journey_map", "persona_assignment", "competitor", "message_map", "early_warning_signal"],
   brand_marketing_head: ["brand_plan"],
   insights_analytics_lead: ["segment", "channel", "channel_fit", "channel_plan", "outcome", "scorecard", "lift_estimate", "prior_update", "assumption_review"],

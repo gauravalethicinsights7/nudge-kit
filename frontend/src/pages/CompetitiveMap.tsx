@@ -16,8 +16,8 @@ import {
   Field,
   MetricStat,
   Pill,
-  SectionHeading,
 } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 import type { BadgeColor } from "../components/shared/ui";
 
 const STRENGTH_VALUE: Record<string, number> = { owned: 1, contested: 0.5, absent: 0 };
@@ -62,11 +62,9 @@ export function CompetitiveMap() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="M4 · Know the doctors"
-        title="Competitive Map"
-        sub="Competitor set, claim grid (owned, contested, absent), message whitespace and early-warning signals."
-        right={
+      <StageHeader
+        stageId="m4"
+                right={
           <RunButton
             label="Run M4"
             onRun={() => runM4.mutate({})}

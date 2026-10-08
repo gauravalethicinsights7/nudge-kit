@@ -19,9 +19,9 @@ import {
   EmptyState,
   Field,
   MicroLabel,
-  SectionHeading,
   StepHeading,
 } from "../components/shared/ui";
+import { StageHeader } from "../components/shared/StageHeader";
 import { normalizeBullets } from "../lib/bullets";
 
 export function PersonasJourneys() {
@@ -47,11 +47,9 @@ export function PersonasJourneys() {
 
   return (
     <div>
-      <SectionHeading
-        eyebrow="M3 · Know the doctors"
-        title="Personas & Journeys"
-        sub="Personas derived from synthetic context, call notes, survey or social data — each with ranked drivers, barriers by rung and channel affinity."
-        right={
+      <StageHeader
+        stageId="m3"
+                right={
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <div className="form-row" style={{ margin: 0 }}>
               <label>Count</label>

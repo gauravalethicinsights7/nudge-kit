@@ -4,44 +4,59 @@ import {
   Layers, Radio, ScrollText, Swords, Target, Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useBrand } from "../api/hooks";
+import { useApprovals, useBrand } from "../api/hooks";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { AvatarInitials } from "../components/shared/ui";
+import { STAGES, STAGE_GROUPS, stageById } from "../domain/stages";
 
-const NAV: { section: string; items: { to: string; label: string; icon: LucideIcon }[] }[] = [
-  { section: "Understand the market", items: [
-    { to: "", label: "Overview", icon: LayoutDashboard },
-    { to: "data-hub", label: "Data Hub", icon: Database },
-    { to: "market-landscape", label: "Market Landscape", icon: BarChart3 },
-    { to: "evidence", label: "Evidence Library", icon: BookOpen },
-  ]},
-  { section: "Know the doctors", items: [
-    { to: "segments", label: "Segments & Targeting", icon: Layers },
-    { to: "personas", label: "Personas & Journeys", icon: Users },
-    { to: "competitive", label: "Competitive Map", icon: Swords },
-  ]},
-  { section: "Decide the plan", items: [
-    { to: "brand-plan", label: "Brand Plan", icon: ScrollText },
-    { to: "channel-planner", label: "Channel Planner", icon: Radio },
-  ]},
-  { section: "Act and learn", items: [
-    { to: "orchestration", label: "Orchestration & NBA", icon: GitBranch },
-    { to: "measurement", label: "Measurement", icon: Target },
-  ]},
-  { section: "Governance", items: [
-    { to: "approvals", label: "Approvals Inbox", icon: Inbox },
-  ]},
-];
-
-const ALL_ITEMS = NAV.flatMap((g) => g.items);
+const ICONS: Record<string, LucideIcon> = {
+  overview: LayoutDashboard,
+  data: Database,
+  m1: BarChart3,
+  evidence: BookOpen,
+  m2: Layers,
+  m3: Users,
+  m4: Swords,
+  m5: ScrollText,
+  m6: Radio,
+  m7: GitBranch,
+  m8: Target,
+  appr: Inbox,
+};
 
 export function BrandLayout() {
   const { brandId } = useParams();
   const { data: brand } = useBrand(brandId);
+  const { data: approvals } = useApprovals(brandId);
   const location = useLocation();
 
   const currentSegment = location.pathname.split(`/brands/${brandId}/`)[1] ?? "";
-  const currentItem = ALL_ITEMS.find((i) => i.to === currentSegment) ?? ALL_ITEMS[0];
+  const currentStage = STAGES.find((s) => s.route === currentSegment) ?? STAGES[0];
+
+  // Draft counts come from the approvals inbox, so the rail shows the same
+  // truth the governance page does rather than a second opinion.
+  const draftCounts = new Map((approvals ?? []).map((a) => [a.entity_type, a.draft_count]));
+  const pendingTotal = (approvals ?? []).reduce((n, a) => n + a.draft_count, 0);
+
+  /** The approvals endpoint only reports entity types that still have drafts,
+   *  so absence means "nothing outstanding" — which is NOT the same as
+   *  "approved": a module that never ran also has nothing outstanding. The
+   *  rail says only what it can actually tell, and the Command centre (which
+   *  does query each module) is where "has data" is established. */
+  const statusOf = (stageId: string): "clear" | "draft" => {
+    const stage = stageById(stageId);
+    if (!stage?.entityTypes.length) return "clear";
+    return stage.entityTypes.some((t) => (draftCounts.get(t) ?? 0) > 0) ? "draft" : "clear";
+  };
+
+  const DOT: Record<string, string> = {
+    draft: "var(--amber)",
+    clear: "var(--emerald)",
+  };
+  const DOT_TITLE: Record<string, string> = {
+    draft: "Has output waiting for sign-off",
+    clear: "Nothing waiting for sign-off",
+  };
 
   return (
     <div className="app-shell">
@@ -60,20 +75,51 @@ export function BrandLayout() {
           </div>
         </Link>
 
-        {NAV.map((group) => (
-          <div key={group.section}>
-            <div className="sidebar-section">{group.section}</div>
-            {group.items.map((item) => {
-              const Icon = item.icon;
+        {STAGE_GROUPS.map((group) => (
+          <div key={group}>
+            <div className="sidebar-section">{group}</div>
+            {STAGES.filter((s) => s.group === group).map((stage) => {
+              const Icon = ICONS[stage.id] ?? LayoutDashboard;
+              const st = statusOf(stage.id);
               return (
                 <NavLink
-                  key={item.to}
-                  to={`/brands/${brandId}/${item.to}`}
-                  end={item.to === ""}
+                  key={stage.id}
+                  to={`/brands/${brandId}/${stage.route}`}
+                  end={stage.route === ""}
                   className={({ isActive }) => (isActive ? "active" : "")}
+                  title={stage.decision}
                 >
                   <Icon size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
-                  <span className="nav-label">{item.label}</span>
+                  <span className="nav-label" style={{ flex: 1, minWidth: 0 }}>
+                    {stage.label}
+                  </span>
+                  {stage.id === "appr" && pendingTotal > 0 ? (
+                    <span
+                      title={`${pendingTotal} drafts awaiting review`}
+                      style={{
+                        background: "var(--gold)",
+                        color: "var(--navy)",
+                        borderRadius: 9,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "1px 6px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {pendingTotal > 999 ? "999+" : pendingTotal}
+                    </span>
+                  ) : stage.entityTypes.length ? (
+                    <span
+                      title={DOT_TITLE[st]}
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        background: DOT[st],
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : null}
                 </NavLink>
               );
             })}
@@ -87,7 +133,7 @@ export function BrandLayout() {
             items={[
               { label: "Portfolio", to: "/" },
               { label: brand?.name ?? "Brand", to: `/brands/${brandId}` },
-              { label: currentItem?.label ?? "Overview" },
+              { label: currentStage?.label ?? "Overview" },
             ]}
           />
         </div>

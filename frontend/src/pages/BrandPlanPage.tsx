@@ -8,6 +8,13 @@ import { ChartCard } from "../components/charts/ChartCard";
 import { BarChart } from "../components/charts/BarChart";
 import { SkeletonText } from "../components/Skeleton";
 import { DetailModal } from "../components/shared/DetailModal";
+import { StageHeader } from "../components/shared/StageHeader";
+import {
+  ConfidenceBar,
+  Figure,
+  HowCalculated,
+  gradeOf,
+} from "../components/shared/provenance";
 import {
   AccentCallout,
   Badge,
@@ -15,12 +22,11 @@ import {
   Card,
   EmptyState,
   Field,
-  MetricStat,
-  SectionHeading,
   StepHeading,
   TableWrap,
 } from "../components/shared/ui";
 import { toBullets } from "../lib/bullets";
+import { fmtMoney, fmtMoneyExact } from "../lib/format";
 
 export function BrandPlanPage() {
   const { brandId } = useParams();
@@ -58,12 +64,25 @@ export function BrandPlanPage() {
   const issue = plan?.key_issues.find((k) => k.id === openIssue) ?? null;
   const blockers = plan?.compliance_flags.filter((f) => f.severity === "block") ?? [];
 
+  // How much of the forecast is assumption rather than data. The spread
+  // between the downside and upside scenarios is the model's own statement
+  // of how little it knows — better than quoting the base case alone.
+  const spreadPct = plan
+    ? ((plan.forecast.upside.revenue.value - plan.forecast.downside.revenue.value) /
+        Math.max(plan.forecast.base.revenue.value, 1)) *
+      100
+    : 0;
+
+  // Named in the spec: assumptions that are load-bearing but weakly held
+  // become tests rather than quiet inputs.
+  const weakAssumptions = [...(plan?.forecast.base.assumptions ?? [])]
+    .filter((a) => a.confidence < 0.5)
+    .sort((a, b) => a.confidence - b.confidence);
+
   return (
     <div>
-      <SectionHeading
-        eyebrow="M5 · Decide the plan"
-        title="Brand Plan"
-        sub="Situation, key issues, imperatives, positioning, message house, objectives, forecast and budget — compliance-checked before export."
+      <StageHeader
+        stageId="m5"
         right={
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <div className="form-row" style={{ margin: 0 }}>
@@ -103,6 +122,7 @@ export function BrandPlanPage() {
       />
 
       {isLoading && <Card><SkeletonText lines={4} /></Card>}
+
       {!isLoading && !plan && (
         <Card>
           <EmptyState
@@ -170,7 +190,7 @@ export function BrandPlanPage() {
                     {toBullets(ki.statement)[0] ?? ki.statement}
                   </div>
                   <Badge color="gold">
-                    {ki.revenue_at_stake.value.toLocaleString()} {ki.revenue_at_stake.currency} at stake
+                    {fmtMoney(ki.revenue_at_stake.value, ki.revenue_at_stake.currency)} {ki.revenue_at_stake.currency} at stake
                   </Badge>
                 </button>
               ))}
@@ -275,18 +295,69 @@ export function BrandPlanPage() {
           <Card>
             <StepHeading n={7} title="Forecast and budget" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, marginBottom: 18 }}>
-              <MetricStat
+              <Figure
                 label="Base revenue"
-                value={plan.forecast.base.revenue.value.toLocaleString()}
-                sub={plan.forecast.base.revenue.currency}
+                value={fmtMoney(plan.forecast.base.revenue.value, plan.forecast.base.revenue.currency)}
+                unit={plan.forecast.base.revenue.currency}
+                grade={gradeOf(plan.forecast.base.revenue.origin)}
+                prov={plan.forecast.base.revenue}
+                calc={
+                  <HowCalculated
+                    formula="Doctors in journeys → doctors trying (move rate × months) → patients on therapy (new patients per doctor × months × persistence) → revenue (patients × monthly price × 12)."
+                    steps={[
+                      { label: "Downside", value: fmtMoneyExact(plan.forecast.downside.revenue.value, plan.forecast.downside.revenue.currency) },
+                      { label: "Base", value: fmtMoneyExact(plan.forecast.base.revenue.value, plan.forecast.base.revenue.currency) },
+                      { label: "Upside", value: fmtMoneyExact(plan.forecast.upside.revenue.value, plan.forecast.upside.revenue.currency) },
+                    ]}
+                    result={`${spreadPct.toFixed(0)}% spread between downside and upside`}
+                    note="The model never averages the scenarios. A wide spread means the assumptions below are doing the work, not the data — which is why the low-confidence ones become tests."
+                  />
+                }
               />
-              <MetricStat label="Base ROI" value={plan.forecast.base.roi?.toFixed(2) ?? "n/a"} tone="gold" />
-              <MetricStat
-                label="Budget lines"
-                value={plan.budget.placeholder ? "—" : `${plan.budget.lines.length}`}
-                sub={plan.budget.placeholder ? "Placeholder — run M6" : "Computed"}
+              <Figure label="Base ROI" value={plan.forecast.base.roi?.toFixed(2) ?? "n/a"} tone="gold" />
+              <Figure
+                label="Forecast spread"
+                value={`${spreadPct.toFixed(0)}%`}
+                tone={spreadPct > 60 ? "red" : spreadPct > 30 ? "gold" : "emerald"}
+                sub={
+                  spreadPct > 60
+                    ? "Very wide — treat the base case as a hypothesis, not a plan"
+                    : spreadPct > 30
+                    ? "Moderate — worth tightening the weakest assumptions"
+                    : "Tight — the forecast is reasonably well constrained"
+                }
               />
             </div>
+
+            {weakAssumptions.length > 0 && (
+              <AccentCallout
+                tone="gold"
+                label={`${weakAssumptions.length} assumption${weakAssumptions.length === 1 ? "" : "s"} should be tested before you commit`}
+                icon={<AlertTriangle size={12} />}
+                style={{ marginBottom: 18 }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {weakAssumptions.map((a) => (
+                    <div
+                      key={a.name}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
+                    >
+                      <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>{a.name}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span className="tabular" style={{ fontSize: 12.5, fontWeight: 600 }}>
+                          {a.value}
+                        </span>
+                        <ConfidenceBar value={a.confidence} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 8, lineHeight: 1.55 }}>
+                  These carry the forecast but are below 50% confidence. Measurement can design a
+                  pilot to settle each one, and the next cycle replaces the guess with the measured rate.
+                </div>
+              </AccentCallout>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: budgetByChannel.length ? "1fr 1fr" : "1fr", gap: 16 }}>
               <ChartCard title="Forecast scenarios" subtitle="ΔNRx by scenario" height={200}>
                 <BarChart data={scenarioData} x="scenario" y="delta_nrx" valueFormatter={(v) => v.toFixed(1)} height={200} />
@@ -330,7 +401,7 @@ export function BrandPlanPage() {
         open={!!issue}
         onClose={() => setOpenIssue(null)}
         eyebrow="Key issue"
-        title={issue ? `${issue.revenue_at_stake.value.toLocaleString()} ${issue.revenue_at_stake.currency} at stake` : ""}
+        title={issue ? `${fmtMoneyExact(issue.revenue_at_stake.value, issue.revenue_at_stake.currency)} ${issue.revenue_at_stake.currency} at stake` : ""}
         width={760}
       >
         {issue && (
